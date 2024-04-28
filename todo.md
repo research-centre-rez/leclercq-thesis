@@ -5,9 +5,9 @@
 
 # Meeting stuff
 
-- [] do meeting
-- [] get the article name and download it
-- [] dať zadanie do SISu
+- [ ] do meeting
+- [ ] get the article name and download it
+- [ ] dať zadanie do SISu
 
 # Other
-- [] figure out stuff with HR department
+- [ ] figure out stuff with HR department
