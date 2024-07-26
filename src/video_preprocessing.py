@@ -1,15 +1,25 @@
 import numpy as np
 import cv2 as cv
-from moviepy.editor import VideoFileClip
 import os
+os.environ["IMAGEIO_FFMPEG_EXE"] = "/usr/bin/ffmpeg"
+import subprocess
 
 def detect_black_frames(vid_path, threshold=1):
     prev_black = True
 
-    cap = cv.VideoCapture(vid_path)
+    cap = cv.VideoCapture(vid_path, cv.CAP_FFMPEG)
+    fps = int(cap.get(cv.CAP_PROP_FPS))
     print(f"loaded video {os.path.splitext(os.path.basename(vid_path))[0]}")
     black_frame_indices = []
-    frame_count = int(cap.get((cv.CAP_PROP_FRAME_COUNT)))
+    frame_count= int(cap.get((cv.CAP_PROP_FRAME_COUNT)))
+    height = int(cap.get(cv.CAP_PROP_FRAME_HEIGHT))
+    width = int(cap.get(cv.CAP_PROP_FRAME_WIDTH))
+    center_x, center_y = width // 2, height // 2
+    half_size = 50
+    start_x = center_x - half_size
+    start_y = center_y - half_size
+    end_x = center_x + half_size
+    end_y = center_y + half_size
 
     for i in range(frame_count):
         print(f'\rworking on frame: {i} out of {frame_count}', end='', flush=True)
@@ -20,35 +30,42 @@ def detect_black_frames(vid_path, threshold=1):
         if i == frame_count-1 and not prev_black:
             black_frame_indices.append(i)
 
-        elif prev_black and np.mean(frame) > threshold:
-            black_frame_indices.append(i-1)
+        elif prev_black and np.mean(frame[start_y:end_y, start_x:end_x]) > threshold:
+            black_frame_indices.append(i)
             prev_black = False
 
-        elif not prev_black and np.mean(frame) < threshold:
-            black_frame_indices.append(i)
+        elif not prev_black and np.mean(frame[start_y:end_y, start_x:end_x]) < threshold:
+            black_frame_indices.append(i-1)
             prev_black = True
 
     cap.release()
     print(f'\rnumber of black frames: {black_frame_indices}')
-    return black_frame_indices
+    return black_frame_indices, fps
 
-def split_video(video_path, frame_idx, output_dir):
-    clip = VideoFileClip(video_path)
-    fps = clip.fps
+def split_video(video_path, frame_idx, output_dir, fps):
+    fps = fps
+
+    base_name = os.path.splitext(os.path.basename(video_path))[0]
+    output_dir = os.path.join(output_dir, (base_name.split('-')[0]))
+
+    print(f'{base_name} is going to be saved to {output_dir}')
+
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
 
     index = 0
     for i in range(0, len(frame_idx), 2):
         print('indices of frames: ', (frame_idx[i], frame_idx[i+1]))
 
         start, end = frame_idx[i], frame_idx[i+1]
-        base_name = os.path.splitext(os.path.basename(video_path))[0]
-        print(base_name)
 
         start_t = start / fps
         end_t = end / fps
 
-        subclip = clip.subclip(start_t, end_t).without_audio()
-        subclip.write_videofile(f'{output_dir}{base_name}-part{index}.mp4')
+        output_file = os.path.join(output_dir, f'{base_name}-part{index}.mp4')
+        subprocess.call([
+            'ffmpeg', '-i', video_path, '-ss', str(start_t), '-to', str(end_t), '-c', 'copy', '-n', output_file
+        ])
         index += 1
 
 def process_videos(directory_path):
@@ -62,10 +79,10 @@ def process_videos(directory_path):
         if file.endswith('.MP4'):
             video_path = os.path.join(directory_path, file)
 
-            black_frame_idx = detect_black_frames(video_path)
+            black_frame_idx, fps = detect_black_frames(video_path)
 
             if len(black_frame_idx) % 2 == 0:
-                split_video(video_path, black_frame_idx, output_dir)
+                split_video(video_path, black_frame_idx, output_dir, fps)
             else:
                 print(f'Was not able to split file {file}.')
                 failed_files.append(file)
