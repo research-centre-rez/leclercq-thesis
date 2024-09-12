@@ -7,14 +7,27 @@ import torch
 
 from transformers import SegformerImageProcessor, SegformerForSemanticSegmentation
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+#
+# CURRENT_DIR = os.path.dirname(os.path.abspath('__file__'))
+# parent_dir = os.path.abspath(os.path.join(CURRENT_DIR, os.pardir))
+# sys.path.append(parent_dir)
+#
+# checkpoint_path = "../weights/circle_segmentation/circle_segmentation_30e_sched"
+# circle_seg_model = SegformerForSemanticSegmentation.from_pretrained(checkpoint_path).to(device)
 
-CURRENT_DIR = os.path.dirname(os.path.abspath('__file__'))
-parent_dir = os.path.abspath(os.path.join(CURRENT_DIR, os.pardir))
-sys.path.append(parent_dir)
+def init_model():
+    global device 
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-checkpoint_path = "../weights/circle_segmentation/circle_segmentation_30e_sched"
-circle_seg_model = SegformerForSemanticSegmentation.from_pretrained(checkpoint_path).to(device)
+    CURRENT_DIR = os.path.dirname(os.path.abspath('__file__'))
+    parent_dir = os.path.abspath(os.path.join(CURRENT_DIR, os.pardir))
+    sys.path.append(parent_dir)
+
+    checkpoint_path = "../weights/circle_segmentation/circle_segmentation_30e_sched"
+    circle_seg_model = SegformerForSemanticSegmentation.from_pretrained(checkpoint_path).to(device)
+    return circle_seg_model
+
 
 # Works mostly OK, might need some adjustments with parameters.
 def fill_holes(mask):
@@ -33,13 +46,16 @@ def fill_holes(mask):
 
 # Segmentation of the cylinder via the use of Sirotenko's Segformer model
 def get_circle(model, img_path, output_dir, new_size=None):
+    if model is None:
+        model = init_model()
+
     img = cv.imread(img_path)
     img_processor = SegformerImageProcessor(reduce_labels=True)
     pixel_values = img_processor(img, return_tensors="pt").pixel_values.to(device)
 
     with torch.no_grad():
         outputs = model(pixel_values=pixel_values)
-        
+
     predicted_seg_map = img_processor.post_process_semantic_segmentation(
         outputs, target_sizes=[img.shape[0:2]]
     )[0]
@@ -65,7 +81,7 @@ def get_circle(model, img_path, output_dir, new_size=None):
 
     output_dir = os.path.join(output_dir, os.path.splitext(os.path.basename(img_path))[0])
     output_dir = f'{output_dir}-cropped.jpg'
-    print('\n', output_dir)
+    #print(f"\rSaving to:{output_dir}", end='', flush=True)
     cv.imwrite(output_dir, cropped)
 
 def load_images(directory_path):
@@ -82,4 +98,4 @@ def load_images(directory_path):
                 get_circle(circle_seg_model, img_path, output_dir)
     print('')
 
-load_images('../data/dev/temp-test')
+#load_images('../data/dev/temp-test')

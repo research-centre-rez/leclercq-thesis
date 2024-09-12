@@ -2,6 +2,7 @@ import cv2 as cv
 import numpy as np
 import os
 
+#This was test of something that I am no longer using
 def grayscale_video(vid_path):
     base_name = os.path.splitext(os.path.basename(vid_path))[0]
     cap = cv.VideoCapture(vid_path)
