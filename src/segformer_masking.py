@@ -7,14 +7,14 @@ import torch
 
 from transformers import SegformerImageProcessor, SegformerForSemanticSegmentation
 
-# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-#
-# CURRENT_DIR = os.path.dirname(os.path.abspath('__file__'))
-# parent_dir = os.path.abspath(os.path.join(CURRENT_DIR, os.pardir))
-# sys.path.append(parent_dir)
-#
-# checkpoint_path = "../weights/circle_segmentation/circle_segmentation_30e_sched"
-# circle_seg_model = SegformerForSemanticSegmentation.from_pretrained(checkpoint_path).to(device)
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+CURRENT_DIR = os.path.dirname(os.path.abspath('__file__'))
+parent_dir = os.path.abspath(os.path.join(CURRENT_DIR, os.pardir))
+sys.path.append(parent_dir)
+
+checkpoint_path = "../weights/circle_segmentation/circle_segmentation_30e_sched"
+circle_seg_model = SegformerForSemanticSegmentation.from_pretrained(checkpoint_path).to(device)
 
 def init_model():
     global device 
@@ -64,7 +64,7 @@ def get_circle(model, img_path, output_dir, new_size=None):
 
     mask = predicted_seg_map.astype(np.uint8)
 
-    mask = fill_holes(mask)
+    #mask = fill_holes(mask)
 
     img_masked = cv.bitwise_and(img, img, mask=mask)
 

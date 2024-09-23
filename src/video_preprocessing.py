@@ -1,10 +1,11 @@
+import subprocess
+import os
+os.environ["OPENCV_FFMPEG_READ_ATTEMPTS"] = "100000"
 import numpy as np
 import cv2 as cv
-import os
-import subprocess
 
-#before running this you might need to put the following in your terminal:
-# export OPENCV_FFMPEG_READ_ATTEMPTS=100000
+#Before running this you might need to run the following in your terminal:
+#     export OPENCV_FFMPEG_READ_ATTEMPTS=100000
 
 def seconds_to_hms(seconds):
     hours = int(seconds // 3600)
@@ -25,21 +26,24 @@ def detect_black_frames(vid_path, threshold=5):
     print(f"loaded video {os.path.splitext(os.path.basename(vid_path))[0]}")
 
     black_frame_indices = []
-    frame_count= int(cap.get((cv.CAP_PROP_FRAME_COUNT)))
+    frame_count         = int(cap.get((cv.CAP_PROP_FRAME_COUNT)))
+
     height = int(cap.get(cv.CAP_PROP_FRAME_HEIGHT))
-    width = int(cap.get(cv.CAP_PROP_FRAME_WIDTH))
+    width  = int(cap.get(cv.CAP_PROP_FRAME_WIDTH))
 
     center_x, center_y = width // 2, height // 2
     half_size = 1000
+
     start_x = center_x - half_size
     start_y = center_y - half_size
-    end_x = center_x + half_size
-    end_y = center_y + half_size
+    end_x   = center_x + half_size
+    end_y   = center_y + half_size
 
     for i in range(frame_count):
         ret, frame = cap.read()
         mean = np.mean(frame[start_y:end_y, start_x:end_x])
         print(f'\rworking on frame: {i} out of {frame_count}, mean: {mean:.2f}', end='', flush=True)
+
         if not ret:
             break
 
@@ -62,6 +66,7 @@ def split_video(video_path, frame_idx, output_dir, fps):
     """""
     Given the path of a video, split it into separate videos based such that each sub-video
     contains only one angle of lighting.
+    ffmpeg is used in order to preserve the quality of the video(s).
     """""
 
     base_name = os.path.splitext(os.path.basename(video_path))[0]
