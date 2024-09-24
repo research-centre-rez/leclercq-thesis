@@ -8,6 +8,8 @@ from typing import Any, Callable
 
 import warnings
 
+from torchvision.transforms import transforms
+
 warnings.filterwarnings("ignore")
 
 class COSED():
@@ -37,8 +39,18 @@ class COSED():
             # print(mask_name)
             # print("----------------")
 
-            image = torchvision.transforms.PILToTensor()(Image.open(img_name).convert('RGB'))
+            image = Image.open(img_name).convert('RGB')
             mask  = torchvision.transforms.PILToTensor()(Image.open(mask_name).convert('L'))
+            mask = mask > 0
+
+            transform_image = transforms.Compose([
+                transforms.ToTensor(),
+                #transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+            ])
+            transform_mask = transforms.ToTensor()
+
+            image = transform_image(image)
+            #mask = transform_mask(mask)
 
             sample = {'image': image, 'mask': mask}
 
