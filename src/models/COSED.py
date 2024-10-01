@@ -5,6 +5,9 @@ import pandas as pd
 from PIL import Image
 import torchvision
 from typing import Any, Callable
+import lmdb
+import cv2 as cv
+import numpy as np
 
 import warnings
 
@@ -13,14 +16,14 @@ from torchvision.transforms import transforms
 warnings.filterwarnings("ignore")
 
 class COSED():
+    """
+    This the COncrete SEgmentation Dataset. This version takes in a csv files that contains
+    image-mask pairs that are then read into the memory on the fly.
+    """
     class Dataset(Dataset):
-        #COncrete SEgmentation Dataset
         def __init__(self, csv_file, root_dir) -> None:
-            #self.transform = transform
+            print('You are using the base version of COSED')
             self.data = pd.read_csv(csv_file, header=None, names=['img', 'mask'])
-            print("Example of data:")
-            print(self.data.head())
-            print("----------------")
             self.root_dir = root_dir
             self._size = len(self.data)
 
@@ -34,23 +37,11 @@ class COSED():
             img_name  = os.path.join(self.root_dir, self.data.iloc[index, 0])
             mask_name = os.path.join(self.root_dir, self.data.iloc[index, 1])
 
-            # print(img_name)
-            # print("----------------")
-            # print(mask_name)
-            # print("----------------")
-
             image = Image.open(img_name).convert('RGB')
             mask  = torchvision.transforms.PILToTensor()(Image.open(mask_name).convert('L'))
             mask = mask > 0
 
-            transform_image = transforms.Compose([
-                transforms.ToTensor(),
-                #transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-            ])
-            transform_mask = transforms.ToTensor()
-
-            image = transform_image(image)
-            #mask = transform_mask(mask)
+            image = torchvision.transforms.PILToTensor()(image)
 
             sample = {'image': image, 'mask': mask}
 
@@ -59,6 +50,49 @@ class COSED():
         def transform(self, transform: Callable[[dict[str, torch.Tensor]], Any]) -> Dataset:
             return COSED.TransformedDataset(self, transform)
 
+
+    class LMDB_Dataset(Dataset):
+        def __init__(self, lmdb_path) -> None:
+            print('You are using the LMDB version of COSED')
+            self.env = lmdb.open(lmdb_path, readonly=True, lock=False)
+
+            with self.env.begin() as txn:
+                length = txn.get(b'__len__')
+                if length is None:
+                    raise ValueError("Dataset length key no found!!")
+                self._size = int(length.decode())
+
+        def __len__(self) -> int:
+            return self._size
+
+        def __getitem__(self, index):
+            if torch.is_tensor(index):
+                index = index.item()
+
+            with self.env.begin(buffers=True) as txn:
+                cursor = txn.cursor()
+                img_key  = f'image_{index}'.encode()
+                mask_key = f'mask_{index}'.encode()
+
+                img_bytes  = cursor.get(img_key)
+                mask_bytes = cursor.get(mask_key)
+
+            img  = cv.imdecode(np.frombuffer(img_bytes, np.uint8), cv.IMREAD_COLOR)
+            mask = cv.imdecode(np.frombuffer(mask_bytes, np.uint8), cv.IMREAD_GRAYSCALE)
+
+            image = transforms.ToTensor()(img)
+
+            mask = transforms.ToTensor()(mask)
+            mask = mask > 0
+
+            sample = {'image': image, 'mask': mask}
+
+            return sample
+
+        def transform(self, transform: Callable[[dict[str, torch.Tensor]], Any]) -> Dataset:
+            return COSED.TransformedDataset(self, transform)
+
+
     class TransformedDataset(Dataset):
         def __init__(self, dataset: "COSED.Dataset", transform: Callable[[dict[str, torch.Tensor]], Any]) -> None:
             self._dataset = dataset
@@ -66,7 +100,6 @@ class COSED():
 
         def __len__(self) -> int:
             return len(self._dataset)
-            #return self._dataset._size
 
         def __getitem__(self, index: int) -> Any:
             return self._transform(self._dataset[index])
