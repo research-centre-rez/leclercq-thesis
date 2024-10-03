@@ -3,8 +3,14 @@ import sys
 import cv2 as cv
 import numpy as np
 import csv
+import masking
+import argparse
 
-import segformer_masking
+#This is for convenience since extracting screenshots takes some time and we dont need to 
+#always do it, therefore it is set to False by default
+parser = argparse.ArgumentParser()
+parser.add_argument('--crop', default=True, help='Do you want to crop images')
+parser.add_argument('--extract', default=False, help='Do you want to extract images from videos')
 
 def extract_screenshots(vid_path, first_frame_id, distance_id, mismatch_id):
     '''
@@ -40,14 +46,25 @@ def read_csv(csv_path):
             extract_screenshots(name, first_frame_id, distance_id, mismatch_id)
 
 def crop_images(root_dir):
+    model = masking.my_model()
     for dir_, _, files in os.walk(root_dir, topdown=True):
         for file_name in files:
             rel_dir = os.path.relpath(dir_, os.getcwd())
             rel_file = os.path.join(rel_dir, file_name)
 
             if file_name.endswith('.jpg') and "cropped" not in file_name:
-                print(f"Cropping {file_name} via SegFormer..")
-                segformer_masking.get_circle(model=None, img_path=rel_file, output_dir=rel_dir)
+                print(f"Cropping {file_name}")
+                masking.get_circle(model=model, img_path=rel_file, output_dir=rel_dir)
 
-read_csv('final_data.csv')
-crop_images('../data')
+def main(args:argparse.Namespace) -> None:
+    if args.extract:
+        #Extract images
+        read_csv('full_rotation_times.csv')
+    if args.crop:
+        #Crop images
+        crop_images('../data')
+
+
+if __name__ == "__main__":
+    args = parser.parse_args([] if "__file__" not in globals() else None)
+    main(args)

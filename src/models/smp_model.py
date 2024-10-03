@@ -8,6 +8,8 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 import torchvision
+import matplotlib.pyplot as plt
+import numpy as np
 
 class SMP_model(nn.Module):
     def __init__(self,
@@ -37,7 +39,10 @@ class SMP_model(nn.Module):
         self.register_buffer("std", torch.tensor(params["std"]).view(1, 3, 1, 1))
         self.register_buffer("mean", torch.tensor(params["mean"]).view(1, 3, 1, 1))
 
-        self.loss_fn = smp.losses.DiceLoss(smp.losses.BINARY_MODE, from_logits=True)
+        #self.loss_fn = smp.losses.DiceLoss(smp.losses.BINARY_MODE, from_logits=True)
+        self.dice_loss = smp.losses.DiceLoss(smp.losses.BINARY_MODE, from_logits=True)
+        pos_weight = torch.tensor([291 / 200])
+        self.loss_fn = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weight)
 
         self.T_MAX = T_MAX
 
@@ -77,7 +82,7 @@ class SMP_model(nn.Module):
         assert masks.max() <= 1 and masks.min() >= 0
 
         logits_mask = self.forward(imgs)
-        loss = self.loss_fn(logits_mask, masks)
+        loss = self.loss_fn(logits_mask, masks.float())
 
         prob_mask = logits_mask.sigmoid()
         pred_mask = (prob_mask > self.binary_threshold).type(torch.uint8)  # apply thresholding
@@ -101,15 +106,6 @@ class SMP_model(nn.Module):
         self.writer.add_scalar(f'Loss/{stage}', loss, batch_no)
         self.writer.add_scalar(f'IoU/{stage}', self.iou_v, batch_no)
 
-        #print(
-        #    f"{stage} Metrics: IoU: {iou_val:.4f}, F1: {f1_val:.4f}, Precision: {prec_val:.4f}, Recall: {rec_val:.4f}"
-        #)
-        #return {
-        #    "iou": iou_val,
-        #    "f1": f1_val,
-        #    "precision": prec_val,
-        #    "recall": rec_val,
-        #}
 
     def train_model(
         self, train_loader: DataLoader, val_loader: DataLoader, num_epochs, lr
@@ -197,7 +193,9 @@ class SMP_model(nn.Module):
 
         image_gallery      = []
         pred_masks_gallery = []
+
         gt_masks_gallery   = []
+
         with torch.no_grad():
             test_progress = tqdm(test_loader, desc="Testing model", leave=False)
             i = 0
@@ -212,18 +210,50 @@ class SMP_model(nn.Module):
                 test_ious.append(self.iou_v)
                 self.log_metrics('Test', loss, i * len(test_loader) + 1)
                 if i <= 5:
+                    logits = self.forward(images)
+                    pr_masks = logits.sigmoid()
+                    pr_masks = torch.clip(pr_masks, 0, 1)
+
                     image_gallery.append(images[0].cpu())
-                    gt_masks_gallery.append(masks[0].cpu())
-                    pred_masks_gallery.append(pred_mask[0].cpu())
+                    gt_masks_gallery.append(masks[0].squeeze().cpu())
+                    pred_masks_gallery.append(pr_masks[0].squeeze().cpu())
 
         test_loss_mean = sum(test_losses) / len(test_losses)
         test_iou_mean  = sum(test_ious) / len(test_ious)
         print(f"Test Loss: {test_loss_mean:.4f}\nTest IoU: {test_iou_mean:.4f}")
 
-        for i, (img, pred, gt )in enumerate(zip(image_gallery, pred_masks_gallery, gt_masks_gallery)):
-            exp_pred = torch.cat([pred, pred, pred], dim=0)
-            exp_gt   = torch.cat([gt, gt, gt], dim=0)
-            img_grid = torchvision.utils.make_grid([img, exp_gt, exp_pred])
-            self.writer.add_image(f'Results_{i}', img_grid)
-        print("Finished printing images to tensorboard")
+        for i,(img, gt, pred) in enumerate(zip(image_gallery, gt_masks_gallery, pred_masks_gallery)):
+            fig = self.imshow(image=img,
+                        ground_truth=gt,
+                        prediction=pred)
+
+            self.writer.add_figure(f'Test/Showcase_{i}', fig, global_step=i)
+            plt.close(fig)
+
+    def imshow(title= None, **images):
+        """Displays images in one row"""
+        n = len(images)
+        fig, axes = plt.subplots(1, n, figsize=(n*4,5))
+
+        for i, (name, image) in enumerate(images.items()):
+            ax = axes[i]
+            ax.set_xticks([])
+            ax.set_yticks([])
+            ax.set_title(" ".join(name.split("_")).title())
+            if name=='image':
+                ax.imshow(image.permute(1, 2, 0))
+            elif name == 'prediction':
+                im = ax.imshow(image)
+                # Add color bar next to the prediction image
+                cbar = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+                cbar.set_ticks([0, 1])  # Set ticks corresponding to pixel intensities
+                cbar.set_ticklabels(['Background', 'Foreground'])  # Set labels for the ticks
+                ticks = [i * 0.1 for i in range(11)]
+                cbar.set_ticks(ticks)
+                cbar.set_ticklabels([f'{tick:.1f}' for tick in ticks])
+            else:
+                ax.imshow(image, figure=fig)
+
+        plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+        return fig
 

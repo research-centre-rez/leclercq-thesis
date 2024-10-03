@@ -8,11 +8,13 @@ import argparse
 from COSED import COSED
 import matplotlib.pyplot as plt
 from smp_model import SMP_model
+import segmentation_models_pytorch as smp
+from tqdm import tqdm
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--batch_size", default=16, type=int, help="Batch size.")
-parser.add_argument("--episodes", default=1, type=int, help="Training episodes.")
-parser.add_argument("--res", default=128, type=int, help="square resolution of the image")
+parser.add_argument("--batch_size", default=2, type=int, help="Batch size.")
+parser.add_argument("--episodes", default=3, type=int, help="Training episodes.")
+parser.add_argument("--res", default=1024, type=int, help="square resolution of the image")
 parser.add_argument("--learning_rate", default=2e-4, type=float, help="Learning rate.")
 parser.add_argument("--architecture", default='unet', type=str, help="Which architecture to use")
 parser.add_argument("--encoder", default='mit_b0', type=str, help="Which encoder to use")
@@ -148,13 +150,11 @@ def main(args: argparse.Namespace) -> None:
                 logits = model(images)
 
             pr_masks = logits.sigmoid()
-            pr_masks = (pr_masks > 0.2).type(torch.uint8) #apply thresholding
+            #pr_masks = (pr_masks > 0.5).type(torch.uint8) #apply thresholding
             pr_masks = torch.clip(pr_masks, 0, 1)
-            images = torch.clip(images, 0, 1)
 
             for idx, (image, gt_mask, pr_mask) in enumerate(zip(images, masks, pr_masks)):
                 if idx <= 5:
-                    print('.', end='', flush=True)
                     imshow(title=f'{i}_{idx}',
                            image=image.cpu(),
                            ground_truth=gt_mask.squeeze().cpu(),
@@ -166,8 +166,8 @@ def main(args: argparse.Namespace) -> None:
     ####################
     # SAVING THE MODEL #
     ####################
-    saving_to = f'./{args.logdir}/{model_name}'
-    torch.save(model.state_dict(), saving_to)
+    saving_to = f'./{args.logdir}/stored_model'
+    model.model.save_pretrained(saving_to)
 
 if __name__ == "__main__":
     args = parser.parse_args([] if "__file__" not in globals() else None)

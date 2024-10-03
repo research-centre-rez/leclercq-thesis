@@ -38,10 +38,10 @@ class COSED():
             mask_name = os.path.join(self.root_dir, self.data.iloc[index, 1])
 
             image = Image.open(img_name).convert('RGB')
-            mask  = torchvision.transforms.PILToTensor()(Image.open(mask_name).convert('L'))
-            mask = mask > 0
-
             image = torchvision.transforms.PILToTensor()(image)
+
+            mask  = torchvision.transforms.PILToTensor()(Image.open(mask_name).convert('L'))
+            mask  = (mask > 0).type(torch.uint8)
 
             sample = {'image': image, 'mask': mask}
 
