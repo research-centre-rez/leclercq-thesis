@@ -223,7 +223,8 @@ class SMP_model(nn.Module):
         print(f"Test Loss: {test_loss_mean:.4f}\nTest IoU: {test_iou_mean:.4f}")
 
         for i,(img, gt, pred) in enumerate(zip(image_gallery, gt_masks_gallery, pred_masks_gallery)):
-            fig = self.imshow(image=img,
+
+            fig = self.imshow(image=img.type(torch.uint8),
                         ground_truth=gt,
                         prediction=pred)
 

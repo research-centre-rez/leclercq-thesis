@@ -47,7 +47,8 @@ def augment_dataset(datum: dict[str, torch.Tensor]) -> tuple[torch.Tensor, torch
             v2.RandomHorizontalFlip(),
             v2.RandomVerticalFlip(),
             v2.RandomRotation(degrees=30),
-            v2.RandomChannelPermutation()
+            v2.RandomChannelPermutation(),
+            v2.ToDtype(torch.float32),
         ])
 
     image = datum['image']
@@ -64,6 +65,7 @@ def augment_dataset(datum: dict[str, torch.Tensor]) -> tuple[torch.Tensor, torch
 def eval_augment(datum: dict[str, torch.Tensor]) -> tuple[torch.Tensor, torch.Tensor]:
     transformation = v2.Compose([
             v2.Resize((args.res,args.res)),
+            v2.ToDtype(torch.float32),
         ])
 
     img  = datum['image']
@@ -79,8 +81,10 @@ def main(args: argparse.Namespace) -> None:
     ####################
     # DATA PREPARATION #
     ####################
-    dataset = COSED.Dataset(csv_file='./dataset/concrete_segmentation_camvid/image_mask_pairs.txt',
-                            root_dir='./dataset/concrete_segmentation_camvid')
+    csv_file_dir = '../../datasets/concrete_segmentation_camvid/image_mask_pairs.txt'
+    root_dir = '../../datasets/concrete_segmentation_camvid'
+    dataset = COSED.Dataset(csv_file=csv_file_dir,
+                            root_dir=root_dir)
     #dataset = COSED.LMDB_Dataset(lmdb_path='test_lmdb')
 
     train, dev, test = torch.utils.data.random_split(dataset, [0.6, 0.2, 0.2])
@@ -112,7 +116,7 @@ def main(args: argparse.Namespace) -> None:
     args.logdir = os.path.join("logs", "{}-{}-{}".format(
         os.path.basename(globals().get("__file__", "notebook")),
         model_name,
-        datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S")
+        datetime.datetime.now().strftime("%m-%d_%H%M")
     ))
 
     ####################
@@ -166,7 +170,7 @@ def main(args: argparse.Namespace) -> None:
     ####################
     # SAVING THE MODEL #
     ####################
-    saving_to = f'./{args.logdir}/stored_model'
+    saving_to = f'./{args.logdir}/{ARCH}_{ENCODER}'
     model.model.save_pretrained(saving_to)
 
 if __name__ == "__main__":
