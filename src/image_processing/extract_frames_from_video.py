@@ -12,6 +12,7 @@ def extract_frames_from_video(video_path:str, start_frame:int, end_frame:int, ou
     :how_many: How many frames to be extracted
     """
 
+    output_dir = f'{output_dir}/images'
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 

@@ -123,6 +123,9 @@ def my_segmentation(model, img_path, output_dir, new_size=2200) -> None:
     :output_dir: Target destination
     :new_size: Specifies the size of the cropped image
     """
+    if not os.path.exists(f'{output_dir}/cropped') and not os.path.exists(f'{output_dir}/heatmaps'):
+        os.makedirs(f'{output_dir}/cropped', exist_ok=True)
+        os.makedirs(f'{output_dir}/heatmaps', exist_ok=True)
 
     def convert_img_to_tensor(img:Image) -> torch.Tensor:
         transformation = v2.Compose([
@@ -142,7 +145,7 @@ def my_segmentation(model, img_path, output_dir, new_size=2200) -> None:
         temp_mask = (temp_mask * 255).astype(np.uint8)
         temp_mask = cv.applyColorMap(temp_mask, cv.COLORMAP_JET)
         temp_mask = cv.resize(temp_mask, og_dims, interpolation=cv.INTER_CUBIC)
-        tmp_output_dir = os.path.join(output_dir, os.path.splitext(os.path.basename(img_path))[0])
+        tmp_output_dir = os.path.join(f'{output_dir}/heatmaps', os.path.splitext(os.path.basename(img_path))[0])
         tmp_output_dir = f'{tmp_output_dir}-cropped-rawmask.jpg'
         cv.imwrite(tmp_output_dir,temp_mask)
 
@@ -172,7 +175,7 @@ def my_segmentation(model, img_path, output_dir, new_size=2200) -> None:
     cropped    = cv.cvtColor(cropped, cv.COLOR_BGR2RGB) #Set to correct colour channels
 
     # Saving the newly cropped image
-    output_dir = os.path.join(output_dir, os.path.splitext(os.path.basename(img_path))[0])
+    output_dir = os.path.join(f'{output_dir}/cropped', os.path.splitext(os.path.basename(img_path))[0])
     output_dir = f'{output_dir}-cropped.jpg'
     cv.imwrite(output_dir, cropped)
 
