@@ -1,7 +1,15 @@
 import matplotlib.pyplot as plt
 
 def imshow(title= None, **images):
-    """Displays images in one row"""
+    """
+    Displays images in one row.
+    Args:
+        title: What the title of the plot should be
+        **images: the name of the variable determines its title in the graph. 
+            - `image` variable is reserved for torch tensors, channels are permuted
+            - else it prints an image
+    """
+
     n = len(images)
     plt.figure(figsize=(n*4,5))
 
