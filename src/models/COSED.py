@@ -19,13 +19,18 @@ class COSED():
     """
     This the COncrete SEgmentation Dataset. This version takes in a csv files that contains
     image-mask pairs that are then read into the memory on the fly.
+    Args:
+        csv_file: relative path to the csv file
+        root_dir: relative path to the root of the dataset
+        threshold: in the case of noisy masks a basic threshold is applied to denoise them
     """
     class Dataset(Dataset):
-        def __init__(self, csv_file, root_dir) -> None:
+        def __init__(self, csv_file, root_dir, threshold=0) -> None:
             print('You are using the base version of COSED')
-            self.data = pd.read_csv(csv_file, header=None, names=['img', 'mask'])
+            self.data     = pd.read_csv(csv_file, header=None, names=['img', 'mask'])
             self.root_dir = root_dir
-            self._size = len(self.data)
+            self._size    = len(self.data)
+            self.t        = threshold #in case there are noisy images we do basic thresholding
 
         def __len__(self) -> int:
             return self._size
@@ -41,7 +46,8 @@ class COSED():
             image = torchvision.transforms.PILToTensor()(image)
 
             mask  = torchvision.transforms.PILToTensor()(Image.open(mask_name).convert('L'))
-            mask  = (mask > 0).type(torch.uint8)
+            mask  = (mask >= self.t).type(torch.uint8)
+
 
             sample = {'image': image, 'mask': mask}
 

@@ -21,6 +21,7 @@ class SMP_model(nn.Module):
                  threshold,
                  device,
                  logdir,
+                 dynamic_pos_weight = False,
                  **kwargs):
 
         super().__init__()
@@ -66,6 +67,8 @@ class SMP_model(nn.Module):
         self.p_v   = 0
         self.r_v   = 0
 
+        self.dynamic_pos_weight = dynamic_pos_weight
+
     def forward(self, batch):
         batch = (batch - self.mean.to(batch.device)) / self.std.to(batch.device)
         mask = self.model(batch)
@@ -106,6 +109,14 @@ class SMP_model(nn.Module):
         self.writer.add_scalar(f'Loss/{stage}', loss, batch_no)
         self.writer.add_scalar(f'IoU/{stage}', self.iou_v, batch_no)
 
+    def update_pos_weight(self, masks):
+        pos_count  = masks.sum()
+        neg_count  = masks.numel() - pos_count
+        pos_weight = neg_count / (pos_count + 1e-8)
+        pos_weight = torch.tensor([pos_weight], device=self.device)
+
+        self.loss_fn = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weight)
+
 
     def train_model(
         self, train_loader: DataLoader, val_loader: DataLoader, num_epochs, lr
@@ -131,6 +142,8 @@ class SMP_model(nn.Module):
             for batch in train_progress:
                 i += 1
                 images, masks = batch[0].to(self.device), batch[1].to(self.device)
+                if self.dynamic_pos_weight:
+                    self.update_pos_weight(masks)
 
                 optimizer.zero_grad()
                 loss, pred_mask, true_mask = self.shared_step((images, masks))
@@ -257,4 +270,6 @@ class SMP_model(nn.Module):
 
         plt.tight_layout(rect=[0, 0.03, 1, 0.95])
         return fig
+
+
 
