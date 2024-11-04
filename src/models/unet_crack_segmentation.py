@@ -16,7 +16,7 @@ from utils import visualisers
 parser = argparse.ArgumentParser()
 parser.add_argument("--batch_size", default=8, type=int, help="Batch size.")
 parser.add_argument("--episodes", default=3, type=int, help="Training episodes.")
-parser.add_argument("--learning_rate", default=4e-4, type=float, help="Learning rate.")
+parser.add_argument("--learning_rate", default=3e-4, type=float, help="Learning rate.")
 parser.add_argument("--architecture", default='unet', type=str, help="Which architecture to use")
 parser.add_argument("--encoder", default='resnet50', type=str, help="Which encoder to use")
 parser.add_argument('--print_images', default=False, type=bool)
@@ -89,7 +89,7 @@ def main(args: argparse.Namespace) -> None:
     OUT_CLASSES = 1
     ARCH        = args.architecture
     ENCODER     = args.encoder
-    THRESHOLD   = 0.5
+    THRESHOLD   = 0.7
 
     ##########
     # LOGDIR #
