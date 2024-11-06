@@ -77,7 +77,6 @@ class COSED():
                 tensor_mask = torchvision.transforms.PILToTensor()(pil_mask)
                 mask  = torchvision.transforms.PILToTensor()(Image.open(mask_name).convert('L'))
                 mask  = (mask > self.t).type(torch.uint8)
-                visualisers.imshow('mask_comparison', tensor_mask=tensor_mask.permute(1,2,0), pil_mask=pil_mask, mask=mask.permute(1,2,0))
 
 
             sample = {'image': image, 'mask': mask}

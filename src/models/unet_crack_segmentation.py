@@ -31,7 +31,6 @@ def augment_dataset(datum:dict [str, torch.Tensor]) -> tuple[torch.Tensor, torch
 
     image = datum['image']
     mask  = datum['mask']
-    visualisers.imshow(title='mask_before_transformation', image=mask)
 
     state = torch.get_rng_state()
     image = transformation(image)
