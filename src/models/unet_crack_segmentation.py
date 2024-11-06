@@ -7,8 +7,6 @@ from torchvision.transforms import v2
 import argparse
 from COSED import COSED
 from smp_model import SMP_model
-import segmentation_models_pytorch as smp
-from tqdm import tqdm 
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from utils import visualisers
@@ -23,15 +21,17 @@ parser.add_argument('--print_images', default=False, type=bool)
 
 def augment_dataset(datum:dict [str, torch.Tensor]) -> tuple[torch.Tensor, torch.Tensor]:
     transformation = v2.Compose([
+        v2.Resize((416,416)),
         v2.RandomHorizontalFlip(),
         v2.RandomVerticalFlip(),
         v2.RandomRotation(40),
-        v2.GaussianBlur(kernel_size=(3,3), sigma=(0.1, 2.0)),
+        #v2.GaussianBlur(kernel_size=(3,3), sigma=(0.1, 2.0)), #Dataset might contain some noise
         v2.ToDtype(torch.float32)
     ])
 
     image = datum['image']
     mask  = datum['mask']
+    visualisers.imshow(title='mask_before_transformation', image=mask)
 
     state = torch.get_rng_state()
     image = transformation(image)
@@ -41,9 +41,11 @@ def augment_dataset(datum:dict [str, torch.Tensor]) -> tuple[torch.Tensor, torch
 
     return image, mask
 
+
 def eval_augment(datum:dict [str, torch.Tensor]) -> tuple[torch.Tensor, torch.Tensor]:
     transformation = v2.Compose([
-        v2.GaussianBlur(kernel_size=(3,3), sigma=(0.1, 2.0)),
+        v2.Resize((416,416)),
+        #v2.GaussianBlur(kernel_size=(3,3), sigma=(0.1, 2.0)),
         v2.ToDtype(torch.float32)
     ])
 
@@ -54,7 +56,8 @@ def eval_augment(datum:dict [str, torch.Tensor]) -> tuple[torch.Tensor, torch.Te
     mask  = transformation(mask)
 
     return image, mask
-    
+
+
 def main(args: argparse.Namespace) -> None:
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     print(f'Using {device} to train the model')
@@ -63,13 +66,13 @@ def main(args: argparse.Namespace) -> None:
     # DATA PREPARATION #
     ####################
 
-    csv_file_dir = '../../datasets/crack_segmentation_dataset/image_mask_pairs.csv'
-    root_dir     = '../../datasets/crack_segmentation_dataset'
+    csv_file_dir = '../../datasets/crackSeg9/image_mask_pairs.csv'
+    root_dir     = '../../datasets/crackSeg9'
 
     dataset = COSED.Dataset(csv_file=csv_file_dir,
                             root_dir=root_dir,
-                            threshold=245)
-
+                            #preload=True,
+                            )
     train, dev, test = torch.utils.data.random_split(dataset, [0.7, 0.2, 0.1])
 
     train = COSED.TransformedDataset(train, transform=augment_dataset)
@@ -89,7 +92,7 @@ def main(args: argparse.Namespace) -> None:
     OUT_CLASSES = 1
     ARCH        = args.architecture
     ENCODER     = args.encoder
-    THRESHOLD   = 0.7
+    THRESHOLD   = 0.5
 
     ##########
     # LOGDIR #
@@ -124,4 +127,3 @@ def main(args: argparse.Namespace) -> None:
 if __name__ == "__main__":
     args = parser.parse_args([] if "__file__" not in globals() else None)
     main(args)
-
