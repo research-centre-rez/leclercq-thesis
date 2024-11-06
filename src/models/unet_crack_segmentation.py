@@ -12,12 +12,13 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from utils import visualisers
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--batch_size", default=8, type=int, help="Batch size.")
-parser.add_argument("--episodes", default=3, type=int, help="Training episodes.")
+parser.add_argument("--batch_size", default=4, type=int, help="Batch size.")
+parser.add_argument("--episodes", default=5, type=int, help="Training episodes.")
 parser.add_argument("--learning_rate", default=3e-4, type=float, help="Learning rate.")
-parser.add_argument("--architecture", default='unet', type=str, help="Which architecture to use")
-parser.add_argument("--encoder", default='resnet50', type=str, help="Which encoder to use")
+parser.add_argument("--architecture", default='fpn', type=str, help="Which architecture to use")
+parser.add_argument("--encoder", default='mit_b1', type=str, help="Which encoder to use")
 parser.add_argument('--print_images', default=False, type=bool)
+parser.add_argument('--loss', default='bce', type=str, choices=['bce', 'dice'])
 
 def augment_dataset(datum:dict [str, torch.Tensor]) -> tuple[torch.Tensor, torch.Tensor]:
     transformation = v2.Compose([
@@ -97,7 +98,7 @@ def main(args: argparse.Namespace) -> None:
     # LOGDIR #
     ##########
 
-    model_name  = f'{ARCH}_{ENCODER}_bs{args.batch_size}_ep{args.episodes}_lr{args.learning_rate}'
+    model_name  = f'{ARCH}_{ENCODER}_bs{args.batch_size}_ep{args.episodes}_lr{args.learning_rate}_loss_{args.loss}'
     args.logdir = os.path.join('logs', '{}-{}-{}'.format(
         os.path.basename(globals().get('__file__', 'notebook')),
         model_name,
@@ -116,11 +117,18 @@ def main(args: argparse.Namespace) -> None:
                       threshold=THRESHOLD,
                       device=device,
                       logdir=args.logdir,
-                      dynamic_pos_weight=True)
+                      dynamic_pos_weight=True,
+                      loss=args.loss)
 
     print(f'Training model {model_name} \n------------------')
     model.train_model(train_loader, dev_loader, EPOCHS, args.learning_rate)
     model.test_model(test_loader)
+
+    ####################
+    # SAVING THE MODEL #
+    ####################
+    saving_to = f'./{args.logdir}/{ARCH}_{ENCODER}'
+    model.model.save_pretrained(saving_to)
 
 
 if __name__ == "__main__":

@@ -30,7 +30,7 @@ class COSED():
         threshold: in the case of noisy masks a basic threshold is applied to denoise them
     """
     class Dataset(Dataset):
-        def __init__(self, csv_file, root_dir, threshold=230, preload=False) -> None:
+        def __init__(self, csv_file, root_dir, threshold=210, preload=False) -> None:
             print(f'You are using the base version of COSED {"with" if preload else "without"} preloading')
             self.data     = pd.read_csv(csv_file, header=None, names=['img', 'mask'])
             self.root_dir = root_dir
@@ -73,8 +73,6 @@ class COSED():
                 image = Image.open(img_name).convert('RGB')
                 image = torchvision.transforms.PILToTensor()(image)
 
-                pil_mask = Image.open(mask_name).convert('L')
-                tensor_mask = torchvision.transforms.PILToTensor()(pil_mask)
                 mask  = torchvision.transforms.PILToTensor()(Image.open(mask_name).convert('L'))
                 mask  = (mask > self.t).type(torch.uint8)
 

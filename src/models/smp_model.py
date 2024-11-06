@@ -22,6 +22,7 @@ class SMP_model(nn.Module):
                  device,
                  logdir,
                  dynamic_pos_weight = False,
+                 loss = 'bce',
                  **kwargs):
 
         super().__init__()
@@ -39,6 +40,15 @@ class SMP_model(nn.Module):
         params = smp.encoders.get_preprocessing_params(encoder_name)
         self.register_buffer("std", torch.tensor(params["std"]).view(1, 3, 1, 1))
         self.register_buffer("mean", torch.tensor(params["mean"]).view(1, 3, 1, 1))
+
+        if loss == 'bce':
+            pos_weight = torch.tensor([291/200])
+            self.loss_fn = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weight)
+            self.loss = loss
+        elif loss == 'dice':
+            self.loss_fn = smp.losses.DiceLoss(smp.losses.BINARY_MODE, from_logits=True)
+            self.loss = loss
+
 
         #self.loss_fn = smp.losses.DiceLoss(smp.losses.BINARY_MODE, from_logits=True)
         self.dice_loss = smp.losses.DiceLoss(smp.losses.BINARY_MODE, from_logits=True)
@@ -142,7 +152,7 @@ class SMP_model(nn.Module):
             for batch in train_progress:
                 i += 1
                 images, masks = batch[0].to(self.device), batch[1].to(self.device)
-                if self.dynamic_pos_weight:
+                if self.dynamic_pos_weight and self.loss == 'bce':
                     self.update_pos_weight(masks)
 
                 optimizer.zero_grad()
