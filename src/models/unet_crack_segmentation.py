@@ -16,9 +16,10 @@ parser.add_argument("--batch_size", default=4, type=int, help="Batch size.")
 parser.add_argument("--episodes", default=5, type=int, help="Training episodes.")
 parser.add_argument("--learning_rate", default=3e-4, type=float, help="Learning rate.")
 parser.add_argument("--architecture", default='fpn', type=str, help="Which architecture to use")
-parser.add_argument("--encoder", default='mit_b1', type=str, help="Which encoder to use")
+parser.add_argument("--encoder", default='efficientnet-b6', type=str, help="Which encoder to use")
 parser.add_argument('--print_images', default=False, type=bool)
 parser.add_argument('--loss', default='bce', type=str, choices=['bce', 'dice'])
+parser.add_argument('--t', default=0.5, type=float)
 
 def augment_dataset(datum:dict [str, torch.Tensor]) -> tuple[torch.Tensor, torch.Tensor]:
     transformation = v2.Compose([
@@ -92,7 +93,7 @@ def main(args: argparse.Namespace) -> None:
     OUT_CLASSES = 1
     ARCH        = args.architecture
     ENCODER     = args.encoder
-    THRESHOLD   = 0.5
+    THRESHOLD   = args.t
 
     ##########
     # LOGDIR #
