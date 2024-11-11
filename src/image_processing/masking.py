@@ -8,6 +8,7 @@ import segmentation_models_pytorch as smp
 from torchvision.transforms import v2
 from PIL import Image
 import torchvision.transforms
+import torch_preprocess
 
 def sirotenko_model():
     """
@@ -127,18 +128,6 @@ def my_segmentation(model, img_path, output_dir, new_size=2200) -> None:
         os.makedirs(f'{output_dir}/cropped', exist_ok=True)
         os.makedirs(f'{output_dir}/heatmaps', exist_ok=True)
 
-    def convert_img_to_tensor(img:Image) -> torch.Tensor:
-        transformation = v2.Compose([
-                v2.ToImage(),
-                v2.ToDtype(torch.float32),
-                v2.Resize((1024,1024))
-            ])
-        img_tensor = torchvision.transforms.PILToTensor()(img)
-        img_tensor = transformation(img_tensor).to(device)
-        img_tensor = img_tensor[None] # Add 'batch' dimension
-        img_tensor = (img_tensor - mean) / std # Normalise image
-        return img_tensor
-
     # Stores predicted mask as a heatmap
     def save_heatmap(prob_mask) -> None:
         temp_mask = prob_mask.squeeze().cpu().numpy()
@@ -151,7 +140,7 @@ def my_segmentation(model, img_path, output_dir, new_size=2200) -> None:
 
     img_PIL    = Image.open(img_path).convert('RGB')
     img_np     = np.array(img_PIL)
-    img_tensor = convert_img_to_tensor(img_PIL)
+    img_tensor = torch_preprocess.load_img_to_tensor(img_path,std, mean, 1024, device)
 
     og_dims = img_PIL.size # save the original dimensions of the image
 

@@ -1,6 +1,7 @@
 import os
 import re
 import datetime
+import pytz
 import torch
 from torch.utils.data import DataLoader
 from torchvision.transforms import v2
@@ -116,7 +117,7 @@ def main(args: argparse.Namespace) -> None:
     args.logdir = os.path.join("logs", "{}-{}-{}".format(
         os.path.basename(globals().get("__file__", "notebook")),
         model_name,
-        datetime.datetime.now().strftime("%m-%d_%H%M")
+        datetime.datetime.now(pytz.timezone('CET')).strftime("%m-%d_%H%M")
     ))
 
     ####################

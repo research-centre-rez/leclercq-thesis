@@ -166,7 +166,7 @@ class SMP_model(nn.Module):
                 self.calculate_metrics(pred_mask, true_mask)
 
                 train_progress.set_postfix(loss=loss.item(), iou=self.iou_v)
-                if i % 5 == 0:
+                if i % 100 == 0:
                     self.log_metrics('Train', loss, epoch*len(train_loader) + i)
 
             scheduler.step()
@@ -198,7 +198,7 @@ class SMP_model(nn.Module):
 
                 self.calculate_metrics(pred_mask, true_mask)
                 val_progress.set_postfix(loss=loss.item())
-                if i % 5 == 0:
+                if i % 100 == 0:
                     self.log_metrics('Val', loss, epoch*len(val_loader) + i)
 
         val_loss_avg = sum(val_losses) / len(val_losses)
