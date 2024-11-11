@@ -30,7 +30,7 @@ class COSED():
         threshold: in the case of noisy masks a basic threshold is applied to denoise them
     """
     class Dataset(Dataset):
-        def __init__(self, csv_file, root_dir, threshold=200, preload=False) -> None:
+        def __init__(self, csv_file, root_dir, threshold=220, preload=False) -> None:
             print(f'You are using the base version of COSED {"with" if preload else "without"} preloading')
             self.data     = pd.read_csv(csv_file, header=None, names=['img', 'mask'])
             self.root_dir = root_dir
