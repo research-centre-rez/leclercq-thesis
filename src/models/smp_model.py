@@ -49,12 +49,6 @@ class SMP_model(nn.Module):
             self.loss_fn = smp.losses.DiceLoss(smp.losses.BINARY_MODE, from_logits=True)
             self.loss = loss
 
-
-        #self.loss_fn = smp.losses.DiceLoss(smp.losses.BINARY_MODE, from_logits=True)
-        self.dice_loss = smp.losses.DiceLoss(smp.losses.BINARY_MODE, from_logits=True)
-        pos_weight = torch.tensor([291 / 200])
-        self.loss_fn = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weight)
-
         self.T_MAX = T_MAX
 
         self.iou = torchmetrics.JaccardIndex(

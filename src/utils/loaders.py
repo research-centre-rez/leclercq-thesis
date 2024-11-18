@@ -36,7 +36,7 @@ def load_smp_model(model_path:str, device='cpu') -> tuple((torch.nn.Module, torc
 
 def load_img_to_tensor(img_path, std, mean, resize=None, device='cpu') -> torch.Tensor:
     '''
-    Given an image path, model's std and mean, load the image to a torch tensor. std and mean should be specific to the architecture. In the case an `smp_model` they should be easily attainable.
+    Given an image path, model's std and mean, load the image to a torch tensor. std and mean should be specific to the architecture. In the case of an `smp_model` they should be easily attainable.
     Args:
         img_path: relative path to the location of the image
         std: standard deviation of the model
@@ -45,7 +45,7 @@ def load_img_to_tensor(img_path, std, mean, resize=None, device='cpu') -> torch.
         resize: Dimensions of the returned image. Defaults to the same dimensions as the image.
         device: Where to store the image tensor. Defaults to `cpu`.
     Returns:
-        Torch tensor with the image, its shape is [1, C, H, W]
+        Torch tensor with the image, its shape is [1, C, H, W] that is already normalised.
         
     '''
     img_PIL = Image.open(img_path).convert('RGB')
