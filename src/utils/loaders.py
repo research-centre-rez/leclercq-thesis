@@ -7,6 +7,8 @@ from torchvision.transforms import v2
 import torchvision.transforms
 from PIL import Image
 
+# Leclercq's util functions
+
 def load_smp_model(model_path:str, device='cpu') -> tuple((torch.nn.Module, torch.Tensor, torch.Tensor)):
     '''
     Given a path to an smp model, load it into memory and return a torch model ready to be used. Extracts encoder name and pre-processing parameters used by the encoder. Sets the model into eval mode.

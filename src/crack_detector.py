@@ -1,5 +1,7 @@
 import os
 
+from cv2.gapi import resize
+
 from utils import visualisers
 from utils import loaders
 import torch
@@ -7,12 +9,13 @@ import cv2 as cv
 from utils import visualisers
 import argparse
 from tqdm import tqdm 
+import numpy as np
 
 argparser = argparse.ArgumentParser()
 argparser.add_argument('--dir_path', default='../datasets/concrete_crack_segmentation', type=str)
-argparser.add_argument('--model_path', default='../weights/unet_efficientnet-b7', type=str)
+argparser.add_argument('--model_path', default='../weights/fpn_timm-efficientnet-b8', type=str)
 argparser.add_argument('--resize', default=416*5, type=int)
-argparser.add_argument('--t', default=0.65, type=float)
+argparser.add_argument('--t', default=0.5, type=float)
 argparser.add_argument('--patch_size', default=416, type=int)
 
 # from https://stackoverflow.com/a/76982095
@@ -75,6 +78,10 @@ def main(args):
     imgs_path   = os.path.join(dir_path, 'images')
     sample_path = os.path.join(dir_path, 'samples')
 
+    if not os.path.exists(sample_path) or not os.path.exists(mask_path):
+        os.makedirs(sample_path, exist_ok=True)
+        os.makedirs(mask_path, exist_ok=True)
+
     model, mean, std = loaders.load_smp_model(model_path, device)
 
     i = 0
@@ -99,9 +106,17 @@ def main(args):
             image = image * 255
 
             resized_mask = cv.resize(image, (2200, 2200), interpolation=cv.INTER_CUBIC)
+            resized_mask = (resized_mask > 1).astype(np.uint8) * 255
 
-            saving_dest = os.path.join(mask_path, file)
-            cv.imwrite(saving_dest, resized_mask) # saving the resized mask
+            assert len(np.unique(resized_mask)) <= 2, 'resized_mask is not binary'
+
+            #Encoding the mask as a png
+            png_file    = file.split('.')[0]
+            png_file    = png_file + '.png'
+            saving_dest = os.path.join(mask_path, png_file)
+
+            # saving the resized mask
+            cv.imwrite(saving_dest, resized_mask)
 
             if i % 20 == 0:
                 raw_img = cv.imread(img_path)

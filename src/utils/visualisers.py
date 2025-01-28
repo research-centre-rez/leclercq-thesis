@@ -1,6 +1,8 @@
 import matplotlib.pyplot as plt
 import cv2 as cv
 
+# Leclercq's util functions
+
 def show_overlay(saving_dest:str, img:cv.typing.MatLike, mask:cv.typing.MatLike, alpha=0.5) -> None:
     '''
     Saves an overlay of an image and its mask to `saving_dest`. The mask is shown in a green colour.

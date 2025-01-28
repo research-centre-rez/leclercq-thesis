@@ -35,4 +35,5 @@ def create_csv(table, destination):
         writer.writerows(table)
 
 
-load_csv('./full_rotation_times.csv', '../dev_dataset', 3)
+if __name__ == "__main__":
+    load_csv('./full_rotation_times.csv', '../dev_dataset', 3)

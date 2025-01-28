@@ -10,6 +10,9 @@ VIDEO_PATH2 = '../data/10/10-vrsek-part1.mp4'
 VIDEO_PATH3 = '../data/1A/1A-exp-part1.mp4'
 
 def plot_accum_graph(data):
+    '''
+    Plots all of the distance graphs in a single figure.
+    '''
     print("Creating accumulation graph..")
     plt.figure()
     for timeline, distances, vid_name in data:
@@ -18,7 +21,6 @@ def plot_accum_graph(data):
     plt.title("Mean dist vs frame id acculumated")
     plt.xlabel('Frame id')
     plt.ylabel('Mean distance')
-    plt.legend()
     plt.savefig('accumulated_graph.png')
     plt.close()
 
@@ -40,6 +42,19 @@ def write_to_csv(data, csv_file_path):
         csv_writer.writerows(data)
 
 def measure_full_rotation_time(video_path, plot_graphs=False):
+    '''
+    Measures how long it takes to make one full rotation. Instead of using time stamps I am marking it as the frame number. Since we know the FPS of the video we get the relevant time stamps trivially. I used ORB matching to try to measure how long it takes the cylinders to make one full rotation (i.e. 360 degrees). Two metrics are used for the measurement:
+        - Minimum number of mismatches made between the starting frame and the rest of the frames in the video. 
+        - Minimum mean distance between matches, comparing starting frame and all the other frames.
+    Args:
+        video_path: relative path to the video
+        plot_graphs: Plot graphs of the two metrics for each video, default is False.
+    Returns:
+        starting_frame: Where we started with the measurement.
+        min_dist_frame_id: Frame ID with the minimum mean distance to the starting frame.
+        min_mismatch_frame_id: Frame ID with minimum number of mismatches.
+        vid_time: min_dist_frame_id / fps
+    '''
     base_name = os.path.splitext(os.path.basename(video_path))[0]
     print(f"Processing video {base_name}..")
 
@@ -114,15 +129,16 @@ def measure_full_rotation_time(video_path, plot_graphs=False):
     mean_distances    = np.array(mean_distances)
     min_dist          = mean_distances.min()
     min_dist_frame_id = timeline[mean_distances.argmin()]
-    time              = min_dist_frame_id / fps
+    vid_time          = (min_dist_frame_id / fps) - start_time_seconds
 
     mismatches            = np.array(mismatches)
     min_mismatch_frame_id = timeline[mismatches.argmin()]
-    mismatch_time         = min_mismatch_frame_id / fps
+    mismatch_time         = (min_mismatch_frame_id / fps) - start_time_seconds
 
-    print(f"min dist: {min_dist} time: {time:.3f} mismatch time: {mismatch_time:.3f}")
+    print(f"min dist: {min_dist} time: {vid_time:.3f} mismatch time: {mismatch_time:.3f}")
 
-    return starting_frame, min_dist_frame_id, min_mismatch_frame_id, time
+    return starting_frame, min_dist_frame_id, min_mismatch_frame_id, vid_time
+
 
 def process_videos_in_directories(root_dir):
     counter      = 0
@@ -173,7 +189,7 @@ def process_videos_in_directories(root_dir):
     csv_data = list(zip(vidids, start_frames, min_ids, min_mismatch))
     write_to_csv(csv_data, './final_data.csv')
 
-#measure_full_rotation_time(VIDEO_PATH1, True)
-#measure_full_rotation_time(VIDEO_PATH2, True)
-#measure_full_rotation_time(VIDEO_PATH3, True)
-process_videos_in_directories("../data")
+if __name__ == "__main__":
+    res = measure_full_rotation_time('./calibration_video/calibration_video-part1.mp4', True)
+    print(res)
+
