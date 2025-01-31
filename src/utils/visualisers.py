@@ -28,7 +28,7 @@ def imshow(title= None, **images) -> None:
     '''
 
     n = len(images)
-    plt.figure(figsize=(n*4,5))
+    plt.figure(figsize=(n*4,3))
 
     for i, (name, image) in enumerate(images.items()):
         plt.subplot(1, n, i+1)
