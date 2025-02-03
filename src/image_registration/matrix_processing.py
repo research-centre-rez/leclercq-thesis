@@ -1,7 +1,6 @@
 #!/bin/python3
 import os
 import sys
-from matplotlib.pyplot import imshow
 import numpy as np
 import video_matrix
 import cv2 as cv
