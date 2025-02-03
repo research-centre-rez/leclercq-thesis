@@ -79,9 +79,9 @@ def main(args):
     masked_maxmin = mask_img_with_min(to_mask=max_min, min_img=min_img)
     create_histogram(masked_maxmin, base_name)
 
-    visualisers.imshow(title=f'{base_name}_gallery', min=gray_to_rgb(min_img), max=gray_to_rgb(max_img), max_minus_min=gray_to_rgb(max_min), masked_maxmin=gray_to_rgb(masked_maxmin))
+    visualisers.imshow(title=f'./images/{base_name}_gallery', min=gray_to_rgb(min_img), max=gray_to_rgb(max_img), max_minus_min=gray_to_rgb(max_min), masked_maxmin=gray_to_rgb(masked_maxmin))
 
-    visualisers.imshow(title=f'{base_name}_variance', variance=gray_to_rgb(var_img))
+    visualisers.imshow(title=f'./images/{base_name}_variance', variance=var_img)
 
 if __name__ == "__main__":
 

@@ -59,6 +59,7 @@ def rotate_frames(frames, center_offset=(14.08033127, 19.36611469), save_as=None
 
     # Rotation between each frame
     rot_per_frame = 0.1851 # from jupyter notebook
+    #rot_per_frame = 0.1491 # from training data
     rots = np.array([rot_per_frame * i for i in range(frames.shape[0])])
 
     for i,(frame, rotation) in enumerate(tqdm(zip(frames, rots), total=frames.shape[0])):
