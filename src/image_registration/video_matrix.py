@@ -1,11 +1,32 @@
+#!/bin/python3
 import cv2 as cv
 import numpy as np
 import os
 import sys
 from tqdm import tqdm
+import argparse
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from utils import visualisers
+
+# Argparse configuration
+argparser = argparse.ArgumentParser(description='Creating a video matrix and rotating it')
+
+optional = argparser._action_groups.pop()
+req = argparser.add_argument_group('required arguments')
+
+# Required arguments
+req.add_argument('-i', '--input', type=str, help='Path to the input video', required=True)
+req.add_argument('--rotate', action=argparse.BooleanOptionalAction, help='Whether to register each frame onto the starting frame', required=True)
+
+# Optional arguments
+optional = argparser.add_argument_group('optional arguments')
+optional.add_argument('--save', action=argparse.BooleanOptionalAction, help='Save the rotated video matrix into a .npy file, if --no-rotate is parsed then the non-rotated video matrix is saved into a .npy file. File name will be the same as the video filename.')
+optional.add_argument('-gs', '--grayscale', default=True, action=argparse.BooleanOptionalAction, help='Use grayscale video or not. It is recommended to use grayscale as it uses 1/3 of the storage.')
+optional.add_argument('-ds', '--downscale_factor',default=2, type=int, help='How much the video should be downscaled. Has to be an integer')
+optional.add_argument('-co', '--center_offset', default=(14.08033127, 19.36611469), type=float, nargs=2, help='Custom center_offset')
+argparser._action_groups.append(optional)
+
 
 def tqdm_generator():
     '''
@@ -22,6 +43,7 @@ def rotate_frames(frames, center_offset=(14.08033127, 19.36611469), save_as=None
             print('Could not load the .npy file, please try again')
             print(e)
             sys.exit(-1)
+
     # Calculate rotation centre
     h,w = frames[0].shape
 
@@ -29,8 +51,10 @@ def rotate_frames(frames, center_offset=(14.08033127, 19.36611469), save_as=None
     c_offset = np.array(center_offset) / 2 # this is because i am halving the videos in size
 
     # Rotation center
-    rot_center = np.array(frames[0].shape[:2][::-1]) / 2 + c_offset
+    img_center = np.array(frames[0].shape[:2][::-1]) / 2
+    rot_center = img_center + c_offset
 
+    print(f'Image center: {img_center}')
     print(f'Rotation center: {rot_center}')
 
     # Rotation between each frame
@@ -52,7 +76,7 @@ def rotate_frames(frames, center_offset=(14.08033127, 19.36611469), save_as=None
 
     return frames
 
-def buffer_video(vid_path:str, grayscale=True, save_as=None, downscale_factor = 2) -> np.ndarray:
+def create_video_matrix(vid_path:str, grayscale=True, save_as=None, downscale_factor = 2) -> np.ndarray:
     '''
     This function loads a video into a matrix where each row is a frame in the video. There is an option to save the matrix as a `.npy` file. If the video is too large to fit into memory, it can be further downscaled with the `downscale_factor` parameter.
 
@@ -93,13 +117,36 @@ def buffer_video(vid_path:str, grayscale=True, save_as=None, downscale_factor = 
             break
 
     frames = np.array(frames)
+    cap.release()
 
     # Cache the matrix
     if save_as:
         np.save(save_as, frames)
     return np.array(frames)
 
-if __name__ == "__main__":
-    vid_path = '../video_processing/calibration_video/calibration_video-part0.mp4'
+def main(args):
 
-    rotate_frames('calib_vid.npy', save_as='calib_vid_rotated.npy')
+    for arg in vars(args):
+        print(f'{arg}: {getattr(args,arg)}')
+
+    base_name = args.input.split('/')[-1].split('.')[0]
+
+    if not args.rotate:
+        create_video_matrix(vid_path=args.input,
+                            grayscale=args.grayscale,
+                            save_as=f'{base_name}_not_rotated' if args.save else None,
+                            downscale_factor=args.downscale_factor)
+
+    if args.rotate:
+        out = create_video_matrix(vid_path=args.input,
+                                  grayscale=args.grayscale,
+                                  downscale_factor=args.downscale_factor)
+        rotate_frames(frames=out,
+                      center_offset=args.center_offset,
+                      save_as=f'{base_name}_rotated' if args.save else None)
+
+
+
+if __name__ == "__main__":
+    args = argparser.parse_args()
+    main(args)
