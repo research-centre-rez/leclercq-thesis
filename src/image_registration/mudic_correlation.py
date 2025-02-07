@@ -60,7 +60,7 @@ def main(args):
     if file_ext == 'mp4':
         print('Processing .mp4 video')
         out = video_matrix.create_video_matrix(args.input)
-	print('Rotating video frames')
+        print('Rotating video frames')
         vid_mat = video_matrix.rotate_frames(out, save_as=None)
     else:
         try:
