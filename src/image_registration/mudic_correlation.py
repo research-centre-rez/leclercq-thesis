@@ -71,7 +71,7 @@ def main(args):
             print(e)
             sys.exit(-1)
 
-    image_stack = dic.image_stack_from_list(list(vid_mat))
+    image_stack = dic.image_stack_from_list(list(vid_mat[15:]))
 
     print('Image stack successfully created')
 
