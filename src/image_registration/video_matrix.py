@@ -58,8 +58,8 @@ def rotate_frames(frames, center_offset=(14.08033127, 19.36611469), save_as=None
     print(f'Rotation center: {rot_center}')
 
     # Rotation between each frame
-    rot_per_frame = 0.1851 # from jupyter notebook
-    #rot_per_frame = 0.1491 # from training data
+    #rot_per_frame = 0.1851 # from jupyter notebook
+    rot_per_frame = 0.1491 # from training data
     rots = np.array([rot_per_frame * i for i in range(frames.shape[0])])
 
     for i,(frame, rotation) in enumerate(tqdm(zip(frames, rots), total=frames.shape[0])):
@@ -127,8 +127,9 @@ def create_video_matrix(vid_path:str, grayscale=True, save_as=None, downscale_fa
 
 def main(args):
 
+    print('Running with the following parameters:')
     for arg in vars(args):
-        print(f'{arg}: {getattr(args,arg)}')
+        print(f'  {arg}: {getattr(args,arg)}')
 
     base_name = args.input.split('/')[-1].split('.')[0]
 
