@@ -55,12 +55,12 @@ def main(args):
     for arg in vars(args):
         print(f'  {arg}: {getattr(args, arg)}')
 
-    base_name = args.input.split('/')[-1].split('.')[0]
-    file_ext  = args.input.split('/')[-1].split('.')[0]
+    base_name, file_ext = args.input.split('/')[-1].split('.')
 
     if file_ext == 'mp4':
         print('Processing .mp4 video')
         out = video_matrix.create_video_matrix(args.input)
+	print('Rotating video frames')
         vid_mat = video_matrix.rotate_frames(out, save_as=None)
     else:
         try:
