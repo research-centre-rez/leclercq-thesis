@@ -70,23 +70,23 @@ def main(args):
             print(e)
             sys.exit(-1)
 
-    visualisers.imshow(title=f'{base_name}_rotated_images', first=gray_to_rgb(vid_mat[0]), hundreth=gray_to_rgb(vid_mat[99]), two_hundreth=gray_to_rgb(vid_mat[199]))
-    min_100 = min_image(vid_mat[:100])
-
-    visualisers.imshow(title=f'{base_name}_min_100', min_100=gray_to_rgb(min_100))
+#    visualisers.imshow(title=f'{base_name}_rotated_images', first=gray_to_rgb(vid_mat[0]), hundreth=gray_to_rgb(vid_mat[99]), two_hundreth=gray_to_rgb(vid_mat[199]))
+#    min_100 = min_image(vid_mat[:100])
+#
+#    visualisers.imshow(title=f'{base_name}_min_100', min_100=gray_to_rgb(min_100))
 
     print('Creating different representations..')
     min_img = min_image(vid_mat)
     max_img = max_image(vid_mat)
     max_min = max_img - min_img
-    #var_img = variance_image(vid_mat)
+    var_img = variance_image(vid_mat)
 
     masked_maxmin = mask_img_with_min(to_mask=max_min, min_img=min_img)
     create_histogram(masked_maxmin, base_name)
 
     visualisers.imshow(title=f'./images/{base_name}_gallery', min=gray_to_rgb(min_img), max=gray_to_rgb(max_img), max_minus_min=gray_to_rgb(max_min), masked_maxmin=gray_to_rgb(masked_maxmin))
 
-    #visualisers.imshow(title=f'./images/{base_name}_variance', variance=var_img)
+    visualisers.imshow(title=f'./images/{base_name}_variance', variance=var_img)
 
 if __name__ == "__main__":
 
