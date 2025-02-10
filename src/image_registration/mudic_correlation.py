@@ -86,6 +86,7 @@ def main(args):
                            image_stack=image_stack,
                            ref_update_frames=ref_frames,
                            maxit=args.max_it,
+                           noconvergence='ignore',
                            max_nr_im=len(vid_mat))
 
     dic_job = dic.DICAnalysis(inputs)
