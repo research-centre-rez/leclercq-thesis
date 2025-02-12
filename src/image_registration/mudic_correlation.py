@@ -4,6 +4,7 @@ import muDIC as dic
 import numpy as np
 import argparse
 import video_matrix
+import logging
 
 parser = argparse.ArgumentParser(description='Estimating correlation between individual frames of the video matrix')
 
@@ -51,6 +52,7 @@ def create_mesh(h,w, image_stack, arguments):
     return mesh
 
 def main(args):
+
     print('Running with the following parameters:')
     for arg in vars(args):
         print(f'  {arg}: {getattr(args, arg)}')
@@ -107,10 +109,6 @@ def main(args):
         np.save('displacement', displacement)
     else:
         np.save(args.save_as, displacement)
-
-    # For visualisation purposes
-    #viz = dic.Visualizer(fields, images=image_stack)
-    #viz.show(field="displacement", frame=3)
 
 if __name__ == "__main__":
     args = parser.parse_args()

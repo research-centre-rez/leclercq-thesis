@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import cv2 as cv
+import numpy as np
 
 # Leclercq's util functions
 
@@ -28,20 +29,33 @@ def imshow(title= None, **images) -> None:
     '''
 
     n = len(images)
-    plt.figure(figsize=(n*4,3))
 
-    for i, (name, image) in enumerate(images.items()):
-        plt.subplot(1, n, i+1)
-        plt.xticks([])
-        plt.yticks([])
-        plt.title(" ".join(name.split("_")).title())
-        if name=='image':
-            plt.imshow(image.permute(1, 2, 0))
+    cols = min(n, 3)
+    rows = int(np.ceil(n / cols))
+
+    fig, axes = plt.subplots(rows, cols, figsize=(cols*4, rows*3), constrained_layout=True)
+
+    if rows == 1:
+        axes = np.array(axes.reshape(1,-1))
+    if cols == 1:
+        axes = np.array(axes.reshape(1,-1))
+
+    axes = axes.flatten()
+
+    for ax, (name, image) in zip(axes, images.items()):
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.set_title(' '.join(name.split('_')).title())
+
+        if name == 'image':
+            ax.imshow(image.permute(1,2,0))
         else:
-            plt.imshow(image)
+            ax.imshow(image)
 
-    plt.tight_layout(rect=[0, 0.03, 1, 0.95])
-    plt.savefig('result' if title is None else title)
+    for ax in axes[len(images):]:
+        ax.axis('off')
+
+    plt.savefig('result' if title is None else title, bbox_inches='tight', dpi=400)
 
     plt.show()
     plt.pause(0.1)

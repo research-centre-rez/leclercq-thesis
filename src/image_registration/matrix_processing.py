@@ -15,6 +15,7 @@ req = argparser.add_argument_group('required arguments')
 req.add_argument('-i', '--input', type=str, required=True, help='Input file, can be either `.npy` or `.mp4` and it will be parsed correctly')
 
 optional = argparser.add_argument_group('optional arguments')
+optional.add_argument('-r', '--representations', nargs='+', choices=['min', 'max', 'max_minus_min', 'masked_maxmin', 'variance'], default=['min', 'max', 'max_minus_min', 'masked_maxmin'], help='Choose which representations to display')
 
 argparser._action_groups.append(optional)
 
@@ -70,23 +71,34 @@ def main(args):
             print(e)
             sys.exit(-1)
 
-#    visualisers.imshow(title=f'{base_name}_rotated_images', first=gray_to_rgb(vid_mat[0]), hundreth=gray_to_rgb(vid_mat[99]), two_hundreth=gray_to_rgb(vid_mat[199]))
-#    min_100 = min_image(vid_mat[:100])
-#
-#    visualisers.imshow(title=f'{base_name}_min_100', min_100=gray_to_rgb(min_100))
-
     print('Creating different representations..')
-    min_img = min_image(vid_mat)
-    max_img = max_image(vid_mat)
-    max_min = max_img - min_img
-    var_img = variance_image(vid_mat)
+    reps = {}
 
-    masked_maxmin = mask_img_with_min(to_mask=max_min, min_img=min_img)
-    create_histogram(masked_maxmin, base_name)
+    if 'min' in args.representations:
+        reps['min'] = min_image(vid_mat)
 
-    visualisers.imshow(title=f'./images/{base_name}_gallery', min=gray_to_rgb(min_img), max=gray_to_rgb(max_img), max_minus_min=gray_to_rgb(max_min), masked_maxmin=gray_to_rgb(masked_maxmin))
+    if 'max' in args.representations:
+        reps['max'] = max_image(vid_mat)
 
-    visualisers.imshow(title=f'./images/{base_name}_variance', variance=var_img)
+    if 'max_minus_min' in args.representations:
+        max_min = reps.get('max', max_image(vid_mat)) - reps.get('min', min_image(vid_mat))
+        reps['max_minus_min'] = max_min
+
+    if 'masked_maxmin' in args.representations:
+        max_min = reps.get('max_minus_min', max_image(vid_mat) - min_image(vid_mat))
+        masked_maxmin = mask_img_with_min(to_mask=max_min, min_img=reps.get('min', min_image(vid_mat)))
+        create_histogram(masked_maxmin, base_name)
+        reps['masked_maxmin'] = masked_maxmin
+
+    if 'variance' in args.representations:
+        reps['variance'] = variance_image(vid_mat)
+
+    for key, value in reps.items():
+        if key == 'variance':
+            continue
+        reps[key] = gray_to_rgb(value)
+
+    visualisers.imshow(title=f'./images/{base_name}_gallery', **reps)
 
 if __name__ == "__main__":
 

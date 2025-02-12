@@ -25,6 +25,7 @@ optional.add_argument('--save', action=argparse.BooleanOptionalAction, help='Sav
 optional.add_argument('-gs', '--grayscale', default=True, action=argparse.BooleanOptionalAction, help='Use grayscale video or not. It is recommended to use grayscale as it uses 1/3 of the storage.')
 optional.add_argument('-ds', '--downscale_factor',default=2, type=int, help='How much the video should be downscaled. Has to be an integer')
 optional.add_argument('-co', '--center_offset', default=(14.08033127, 19.36611469), type=float, nargs=2, help='Custom center_offset')
+optional.add_argument('-sr', '--sampling_rate', default=1, type=int, help='Sampling rate for the rotation')
 argparser._action_groups.append(optional)
 
 
@@ -35,7 +36,7 @@ def tqdm_generator():
     while True:
         yield
 
-def rotate_frames(frames, center_offset=(14.08033127, 19.36611469), save_as=None) -> np.ndarray:
+def rotate_frames(frames, center_offset=(14.08033127, 19.36611469), save_as=None, sampling_rate=1) -> np.ndarray:
     if type(frames) == str:
         try:
             frames = np.load(frames)
@@ -63,14 +64,22 @@ def rotate_frames(frames, center_offset=(14.08033127, 19.36611469), save_as=None
     rots = np.array([rot_per_frame * i for i in range(frames.shape[0])])
 
     for i,(frame, rotation) in enumerate(tqdm(zip(frames, rots), total=frames.shape[0])):
-        # Get the rotation around the rotation center
-        M = cv.getRotationMatrix2D(center=rot_center, angle=rotation, scale=1)
+        if i % sampling_rate != 0:
+            frames[i] = 0
+        else:
+            # Get the rotation around the rotation center
+            M = cv.getRotationMatrix2D(center=rot_center, angle=rotation, scale=1)
 
-        # Rotate the frame
-        rotated_frame = cv.warpAffine(frame, M, (w,h))
+            # Rotate the frame
+            rotated_frame = cv.warpAffine(frame, M, (w,h))
 
-        # Replace the frame in-memory, saving space
-        frames[i] = rotated_frame
+            # Replace the frame in-memory, saving space
+            frames[i] = rotated_frame
+
+
+    if sampling_rate != 1:
+        zeroes = np.where(np.all(frames == 0, axis=(1,2)))[0]
+        frames = np.delete(frames, zeroes, axis=0)
 
     if save_as:
         np.save(save_as, frames)
@@ -145,7 +154,8 @@ def main(args):
                                   downscale_factor=args.downscale_factor)
         rotate_frames(frames=out,
                       center_offset=args.center_offset,
-                      save_as=f'{base_name}_rotated' if args.save else None)
+                      save_as=f'{base_name}_rotated' if args.save else None,
+                      sampling_rate=args.sampling_rate)
 
 
 
