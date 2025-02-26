@@ -17,9 +17,9 @@ req.add_argument('-i', '--input', type=str, required=True, help='Input file, can
 optional = argparser.add_argument_group('optional arguments')
 optional.add_argument('-r', '--representations', nargs='+', choices=['min', 'max', 'max_minus_min', 'masked_maxmin', 'variance'], default=['min', 'max', 'max_minus_min', 'masked_maxmin'], help='Choose which representations to display')
 
-argparser._action_groups.append(optional)
 
-
+def var(a: np.ndarray, axis: int = 0):
+    return np.sum(abs(a - (a.sum(axis=axis) / len(a))) ** 2, axis=axis) / len(a)
 def min_image(video_mat:np.ndarray) -> np.ndarray:
     return video_mat.min(axis=0)
 
@@ -27,7 +27,7 @@ def max_image(video_mat:np.ndarray) -> np.ndarray:
     return video_mat.max(axis=0)
 
 def variance_image(video_mat:np.ndarray) -> np.ndarray:
-    return video_mat.var(axis=0)
+    return video_mat.var(axis=0, dtype=np.float32)
 
 def create_histogram(image, save_as):
     '''
