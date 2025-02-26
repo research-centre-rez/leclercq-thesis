@@ -5,7 +5,12 @@ import matplotlib.pyplot as plt
 from skimage.measure import EllipseModel
 import sys
 
+# TODO:
+# import logging
+# logging.basicConfig(level=logging.INFO, ...)
+# logger = logging.getLogger()
 
+# What are these numbers?
 #31.14389212,  5.11694245 +
 #14.08033127, 19.36611469
 #------------------------
@@ -20,7 +25,7 @@ def plot_ellipse(disp, xc,yc,a,b,theta):
     fig, ax = plt.subplots()
     ax.plot(disp[:,0], disp[:,1], 'bo', label='Data')
     # Generate fitted ellipse outline
-    fit_t = np.linspace(0, 2*np.pi, 300)
+    fit_t = np.linspace(0, 2 * np.pi, 300)
     x_fit = xc + a * np.cos(fit_t) * np.cos(theta) - b * np.sin(fit_t) * np.sin(theta)
     y_fit = yc + a * np.cos(fit_t) * np.sin(theta) + b * np.sin(fit_t) * np.cos(theta)
     ax.plot(x_fit, y_fit, 'r-', label='Fitted ellipse')
@@ -36,11 +41,13 @@ def find_ellipse(disp:np.ndarray):
     success = model.estimate(disp)
 
     if not success:
+        # use logger instead
         print('failed to find an ellipse')
-        sys.exit()
+        sys.exit() # some exit code?
 
     xc, yc, _, _, _ = model.params
     plot_ellipse(disp, *model.params)
+    # use logger instead
     print(f'Center of ellipse: {(xc,yc)}')
     return xc,yc
 
@@ -61,6 +68,7 @@ def find_circle_for_center(displacement:np.ndarray, mesh_nodes:np.ndarray):
 
 
 if __name__ == "__main__":
+    # Very hardcoded - create argparse for this...
     data = np.load('3A-part0_rotated_displacement.npz')
     mesh = data['mesh_nodes']
     disp = data['displacement']

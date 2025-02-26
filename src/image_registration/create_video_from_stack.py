@@ -5,19 +5,34 @@ import os
 import sys
 from tqdm import tqdm
 
-parser = argparse.ArgumentParser(description='Draws displacement from a given `displacement.npz` file.')
+# Pack this into if __name__ == "__main__": to prevent running on module import
+parser = argparse.ArgumentParser(
+    description="""
+        This script converts stack of images stored in {input} file into a video.
+        Video is augmented with circles showing the calculated displacement (source is in {input}_displacement.npz 
+        in the same folder). Displacement file is a product of previous step of image registration (@see ...).
+        
+        TODO: describe format of the video
+        TODO: describe hardcoded values of the centre of the rotation or create input parameter for that
+    """
+)
 
 required = parser.add_argument_group('required arguments')
+# Describe structure of the npy file in the help message
+# There is missing info that you expect "_displacement.npz", link source of the file here.
 required.add_argument('-i', '--input', required=True, help='Path to .npy image stack file')
 
 def main(args):
+    # You build a video, please add info here about that.
+    # Split the method to reading function and writing function
 
-    base_name = os.path.basename(args.input).split('.npy')[0]
+    base_name = os.path.basename(args.input)[:-4]
+    # Use logger if you need this in production quality code or remove
     print(base_name)
-    img_stack = np.load(args.input)[15:]
+    img_stack = np.load(args.input)[15:]  # maybe this "[15:]" should be parameter of the function/input parameter
     h,w = img_stack[0].shape
 
-    disp = f'{base_name}_displacement.npz'
+    disp = f'{base_name}_displacement.npz'  # put this into some config file, describe structure of the *.npz file
     data = np.load(disp)
     mesh = data['mesh_nodes']
     disp = data['displacement'].squeeze()
@@ -36,7 +51,7 @@ def main(args):
     mesh_y = grid_reshaped[:,:,1]
 
     #Calculated centre
-    rot_centre_x = 991
+    rot_centre_x = 991  # This should be in a config file or somewhere close to import section
     rot_centre_y = 534
 
     for frame_id in tqdm(range(img_stack.shape[0]), desc='Writing to video'):

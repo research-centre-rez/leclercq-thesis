@@ -6,6 +6,8 @@ import argparse
 import video_matrix
 import logging
 
+
+# Move this into function or in if __name__ == "__main__": to prevent run on module import
 parser = argparse.ArgumentParser(description='Estimating correlation between individual frames of the video matrix')
 
 optional = parser._action_groups.pop()
@@ -43,6 +45,7 @@ def create_mesh(h,w, image_stack:dic.IO.image_stack.ImageStack, box_w:int, box_h
     offset_x = (box_w * num_elems_x) // 2
     offset_y = (box_h * num_elems_y) // 2
 
+    # Use logger instead
     print(f'Offset: {offset_x, offset_y}')
 
     upp_x = center_w - offset_x
@@ -75,10 +78,12 @@ def correlate_matrix(image_stack:dic.ImageStack, mesh:dic.mesh.meshUtilities.Mes
         Displacement matrix of shape [1, 2, i, j, n] where (i,j) are number of cells in the `x` and `y` axis and `n` is the number of frames.
     '''
 
+    # Use logger instead
     print('Image stack created successfully')
 
     ref_frames = list(np.arange(ref_range, len(image_stack), ref_range))
 
+    # Use logger instead
     print(f'Reference frame update will happen at these frames:\n  {ref_frames}')
 
     inputs  = dic.DICInput(mesh=mesh,
@@ -97,6 +102,7 @@ def correlate_matrix(image_stack:dic.ImageStack, mesh:dic.mesh.meshUtilities.Mes
 
     fields = dic.Fields(results)
 
+    # Put this info into README
     # The displacement is of shape [1, 2, i, j, n]
     # Where:
     # 1 because there is only one displacement matrix?
@@ -118,15 +124,15 @@ def get_mesh_nodes(mesh:dic.mesh.meshUtilities.Mesh) -> np.ndarray:
     y_dist   = np.diff(y_nodes)[0]
     y_centre = y_dist / 2
 
-    centre_nodes_x = np.arange(start=x_nodes[0]+x_centre, step=x_dist, stop=x_nodes[-1])
-    centre_nodes_y = np.arange(start=y_nodes[0]+y_centre, step=y_dist, stop=y_nodes[-1])
+    centre_nodes_x = np.arange(start=x_nodes[0]+x_centre, stop=x_nodes[-1], step=x_dist)
+    centre_nodes_y = np.arange(start=y_nodes[0]+y_centre, stop=y_nodes[-1], step=y_dist)
 
     X, Y = np.meshgrid(centre_nodes_x, centre_nodes_y)
     nodes = np.column_stack([X.ravel(), Y.ravel()])
     return nodes
 
 def main(args):
-
+    # Use logger instead
     print('Running with the following parameters:')
     for arg in vars(args):
         print(f'  {arg}: {getattr(args, arg)}')
@@ -134,15 +140,19 @@ def main(args):
     base_name, file_ext = args.input.split('/')[-1].split('.')
 
     if file_ext == 'mp4':
+        # Use logger instead
         print('Processing .mp4 video')
         out = video_matrix.create_video_matrix(args.input)
+        # Use logger instead
         print('Rotating video frames')
         vid_mat = video_matrix.rotate_frames(out, save_as=None)
     else:
         try:
+            # Use logger instead
             print('Loading .npy file')
             vid_mat = np.load(args.input)
         except OSError as e:
+            # Use logger instead
             print('Could not load the .npy file, please try again')
             print(e)
             sys.exit(-1)
@@ -157,6 +167,7 @@ def main(args):
         np.savez(f'{base_name}_displacement', displacement=displacement, mesh_nodes=mesh_nodes)
     else:
         np.savez(args.save_as, displacement=displacement, mesh_nodes=mesh_nodes)
+
 
 if __name__ == "__main__":
     args = parser.parse_args()

@@ -23,7 +23,7 @@ def rotate_image(image, angle):
 
 def load_csv(csv_path):
     with open(csv_path, mode='r', newline='') as csvfile:
-        reader = csv.reader(csvfile)
+        reader = csv.reader(csvfile)  # For reading files use pands.read_csv - IMO best API
         ncols = len(next(reader))
         csvfile.seek(0)
         print(ncols)

@@ -7,33 +7,64 @@ import cv2 as cv
 import matplotlib.pyplot as plt
 import argparse
 
+# fix this by adding __init__.py into the folder
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from utils import visualisers
 
-argparser = argparse.ArgumentParser(description='Data processing of matrices that are output by video_matrix.py')
+# Move argparser into if __name__ == "__main__": or other function to prevent execution on module load
+argparser = argparse.ArgumentParser(description="""
+    Processes and analyzes matrices generated from video input, 
+    enabling various visual representations (e.g., minimum, maximum, variance) 
+    and transformations for enhanced visualization and interpretation
+    """)
 req = argparser.add_argument_group('required arguments')
-req.add_argument('-i', '--input', type=str, required=True, help='Input file, can be either `.npy` or `.mp4` and it will be parsed correctly')
-
+req.add_argument(
+    '-i',
+    '--input',
+    type=str,
+    required=True,
+    help='Input file, can be either `.npy` or `.mp4` and it will be parsed correctly'
+)
 optional = argparser.add_argument_group('optional arguments')
-optional.add_argument('-r', '--representations', nargs='+', choices=['min', 'max', 'max_minus_min', 'masked_maxmin', 'variance'], default=['min', 'max', 'max_minus_min', 'masked_maxmin'], help='Choose which representations to display')
+optional.add_argument(
+    '-r',
+    '--representations',
+    nargs='+',
+    choices=['min', 'max', 'max_minus_min', 'masked_maxmin', 'variance'],
+    default=['min', 'max', 'max_minus_min', 'masked_maxmin'],
+    help='Choose which representations to display')
 
 
+# Why you do not use np.var(..., axis=). Maybe this is the reason why it runs for so long ...
 def var(a: np.ndarray, axis: int = 0):
     return np.sum(abs(a - (a.sum(axis=axis) / len(a))) ** 2, axis=axis) / len(a)
-def min_image(video_mat:np.ndarray) -> np.ndarray:
+
+
+def min_image(video_mat: np.ndarray) -> np.ndarray:
     return video_mat.min(axis=0)
 
-def max_image(video_mat:np.ndarray) -> np.ndarray:
+
+def max_image(video_mat: np.ndarray) -> np.ndarray:
     return video_mat.max(axis=0)
 
-def variance_image(video_mat:np.ndarray) -> np.ndarray:
+
+def variance_image(video_mat: np.ndarray) -> np.ndarray:
     return video_mat.var(axis=0, dtype=np.float32)
 
+
 def create_histogram(image, save_as):
-    '''
-    Creates a histogram of an image, throws away 0s because there is so many of them that it makes it difficult to read the histogram.
-    '''
-    hist, bins = np.histogram(image[image > 0], bins=256, range=(0,256))
+    """
+    Creates a histogram of a given image by filtering out zero values to enhance readability. The histogram
+    is saved as a file with the specified name.
+
+    Parameters:
+        image (numpy.ndarray): The input image array containing pixel intensity values.
+        save_as (str): The base name for saving the histogram file.
+
+    Returns:
+        None
+    """
+    hist, bins = np.histogram(image[image > 0], bins=256, range=(0, 256))
 
     plt.figure()
     plt.title(f'Histogram of masked Max-Min image for {save_as}')
@@ -43,34 +74,39 @@ def create_histogram(image, save_as):
     plt.savefig(f'{save_as}_hist')
     plt.close()
 
-def mask_img_with_min(to_mask, min_img):
 
+def mask_img_with_min(to_mask, min_img):
     mask = (min_img > 0).astype(dtype=np.uint8)
-    kernel_size = (20,20)
+    kernel_size = (20, 20)  # move this into constant below the imports, describe what the kernel is (in form of CONSTANT_NAME)
     kernel = cv.getStructuringElement(cv.MORPH_ELLIPSE, kernel_size)
     morphed_mask = cv.morphologyEx(mask, cv.MORPH_CLOSE, kernel)
     return cv.bitwise_and(to_mask, to_mask, mask=morphed_mask)
 
+
+# IMO single line code is not necessary to wrap into a function
 def gray_to_rgb(in_img):
     return cv.cvtColor(in_img, cv.COLOR_GRAY2RGB)
 
-def main(args):
 
-    base_name      = args.input.split('/')[-1].split('.')[0]
-    file_extension = args.input.split('/')[-1].split('.')[-1]
+def main(args):
+    base_name = args.input.split('/')[-1].split('.')[0] # os.path.basename is robust to path separator (windows have '\')
+    file_extension = args.input.split('/')[-1].split('.')[-1] # same here, if you want to use split use constant os.path.sep instead of '/'
 
     if file_extension == 'mp4':
         out = video_matrix.create_video_matrix(args.input)
         vid_mat = video_matrix.rotate_frames(out, save_as='temp')
     else:
         try:
+            # Use logger for this
             print('Loading .npy file')
             vid_mat = np.load(args.input)
         except OSError as e:
+            # Use logger for this
             print('Could not load the .npy file, please try again')
             print(e)
             sys.exit(-1)
 
+    # Use logger for this
     print('Creating different representations..')
     reps = {}
 
@@ -100,7 +136,7 @@ def main(args):
 
     visualisers.imshow(title=f'./images/{base_name}_gallery', **reps)
 
-if __name__ == "__main__":
 
+if __name__ == "__main__":
     args = argparser.parse_args()
     main(args)
