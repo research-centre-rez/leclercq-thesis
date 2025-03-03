@@ -1,29 +1,34 @@
-#!/home/erik/Documents/thesis/src/.venv3-11/bin/python
 import sys
+import os
 import muDIC as dic
 import numpy as np
 import argparse
-import video_matrix
 import logging
 
-parser = argparse.ArgumentParser(description='Estimating correlation between individual frames of the video matrix')
+from image_registration import video_matrix
+from utils import pprint
+from utils import filename_builder
 
-optional = parser._action_groups.pop()
-required = parser.add_argument_group('required arguments')
+def parse_args():
+    parser = argparse.ArgumentParser(description='Estimating correlation between individual frames of the video matrix')
 
-# Required arguments
-required.add_argument('-i', '--input', type=str, required=True, help='Path to the input video, can be .npy file or .mp4')
+    optional = parser._action_groups.pop()
+    required = parser.add_argument_group('required arguments')
 
-# Optional arguments
-optional = parser.add_argument_group('optional arguments')
-optional.add_argument('-o', '--save_as', type=str, help='Name of the output file')
-optional.add_argument('--box_h', type=int, default=100, help='Height of the correlation cell')
-optional.add_argument('--box_w', type=int, default=100, help='Width of the correlation cell')
-optional.add_argument('--num_elems_x', type=int, default=5, help='How many cells in the x axis')
-optional.add_argument('--num_elems_y', type=int, default=5, help='How many cells in the y axis')
-optional.add_argument('--max_it', type=int, default=50, help='Max number of iterations in the correlation step')
-optional.add_argument('--ref_range', type=int, default=25, help='How often should the ref frame be updated')
-#parser._action_groups.append(optional)
+    # Required arguments
+    required.add_argument('-i', '--input', type=str, required=True, help='Path to the input video, can be .npy file or .mp4')
+
+    # Optional arguments
+    optional = parser.add_argument_group('optional arguments')
+    optional.add_argument('-o', '--save_as', type=str, help='Name of the output file')
+    optional.add_argument('--box_h', type=int, default=100, help='Height of the correlation cell')
+    optional.add_argument('--box_w', type=int, default=100, help='Width of the correlation cell')
+    optional.add_argument('--num_elems_x', type=int, default=5, help='How many cells in the x axis')
+    optional.add_argument('--num_elems_y', type=int, default=5, help='How many cells in the y axis')
+    optional.add_argument('--max_it', type=int, default=50, help='Max number of iterations in the correlation step')
+    optional.add_argument('--ref_range', type=int, default=25, help='How often should the ref frame be updated')
+
+    return parser.parse_args()
 
 def create_mesh(h,w, image_stack:dic.IO.image_stack.ImageStack, box_w:int, box_h:int, num_elems_x:int, num_elems_y:int) -> dic.mesh.meshUtilities.Mesh:
     '''
@@ -43,7 +48,9 @@ def create_mesh(h,w, image_stack:dic.IO.image_stack.ImageStack, box_w:int, box_h
     offset_x = (box_w * num_elems_x) // 2
     offset_y = (box_h * num_elems_y) // 2
 
-    print(f'Offset: {offset_x, offset_y}')
+    logger = logging.getLogger(__name__)
+
+    logger.debug('Offset: %i %i', offset_x, offset_y)
 
     upp_x = center_w - offset_x
     low_x = center_w + offset_x
@@ -75,11 +82,13 @@ def correlate_matrix(image_stack:dic.ImageStack, mesh:dic.mesh.meshUtilities.Mes
         Displacement matrix of shape [1, 2, i, j, n] where (i,j) are number of cells in the `x` and `y` axis and `n` is the number of frames.
     '''
 
-    print('Image stack created successfully')
+    logger = logging.getLogger(__name__)
+
+    logger.debug('Image stack created successfully')
 
     ref_frames = list(np.arange(ref_range, len(image_stack), ref_range))
 
-    print(f'Reference frame update will happen at these frames:\n  {ref_frames}')
+    logger.debug(f'Reference frame update will happen at these frames:\n  {ref_frames}')
 
     inputs  = dic.DICInput(mesh=mesh,
                            image_stack=image_stack,
@@ -97,6 +106,7 @@ def correlate_matrix(image_stack:dic.ImageStack, mesh:dic.mesh.meshUtilities.Mes
 
     fields = dic.Fields(results)
 
+    # TODO: Copy this information to README.md
     # The displacement is of shape [1, 2, i, j, n]
     # Where:
     # 1 because there is only one displacement matrix?
@@ -105,6 +115,13 @@ def correlate_matrix(image_stack:dic.ImageStack, mesh:dic.mesh.meshUtilities.Mes
     # j = number of grids in vertical direction
     # n = number of images (=length of vid_mat)
     disp = fields.disp()
+
+    # FIXME: aaaa
+    # If the correlation fails, muDIC still returns incomplete displacement and doesn't
+    # say whether there was an error or not
+    if disp.shape[-1] != len(image_stack):
+        logger.error('muDIC correlation failed to run on the whole image_stack, exiting')
+        sys.exit(-1)
 
     return disp
 
@@ -126,25 +143,24 @@ def get_mesh_nodes(mesh:dic.mesh.meshUtilities.Mesh) -> np.ndarray:
     return nodes
 
 def main(args):
+    logging.basicConfig(level=logging.DEBUG, format='%(name)s:%(levelname)s - %(message)s')
+    logger = logging.getLogger(__name__)
+    pprint.pprint_argparse(args, logger)
 
-    print('Running with the following parameters:')
-    for arg in vars(args):
-        print(f'  {arg}: {getattr(args, arg)}')
-
-    base_name, file_ext = args.input.split('/')[-1].split('.')
+    base_name, file_ext = os.path.basename(args.input).split('.')
 
     if file_ext == 'mp4':
-        print('Processing .mp4 video')
+        logger.info('Processing .mp4 video')
         out = video_matrix.create_video_matrix(args.input)
-        print('Rotating video frames')
+        logger.info('Rotating video frames')
         vid_mat = video_matrix.rotate_frames(out, save_as=None)
     else:
         try:
-            print('Loading .npy file')
+            logger.info('Loading .npy file')
             vid_mat = np.load(args.input)
         except OSError as e:
-            print('Could not load the .npy file, please try again')
-            print(e)
+            logger.info('Could not load the .npy file, please try again')
+            logger.error(e)
             sys.exit(-1)
 
     image_stack = dic.image_stack_from_list(list(vid_mat[15:]))
@@ -153,11 +169,13 @@ def main(args):
     mesh_nodes = get_mesh_nodes(mesh)
     displacement = correlate_matrix(image_stack, mesh, args.ref_range, args.max_it)
 
+
     if args.save_as is None:
-        np.savez(f'{base_name}_displacement', displacement=displacement, mesh_nodes=mesh_nodes)
+        save_as = filename_builder.create_out_filename(base_name, [], ['displacement'])
+        np.savez(save_as, displacement=displacement, mesh_nodes=mesh_nodes)
     else:
         np.savez(args.save_as, displacement=displacement, mesh_nodes=mesh_nodes)
 
 if __name__ == "__main__":
-    args = parser.parse_args()
+    args = parse_args()
     main(args)

@@ -151,6 +151,7 @@ def main(args):
 
     if not args.rotate:
         save_as = filename_builder.create_out_filename(base_name, [], ['not', 'rotated'])
+        save_as = f'./npy_files/{save_as}'
         create_video_matrix(vid_path=args.input,
                             grayscale=args.grayscale,
                             save_as=save_as,
@@ -158,6 +159,7 @@ def main(args):
 
     if args.rotate:
         save_as = filename_builder.create_out_filename(base_name, ['temp'], ['rotated'])
+        save_as = f'./npy_files/{save_as}'
         out = create_video_matrix(vid_path=args.input,
                                   grayscale=args.grayscale,
                                   downscale_factor=args.downscale_factor)

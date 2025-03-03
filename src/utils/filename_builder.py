@@ -11,8 +11,9 @@ def create_out_filename(filename:str, prefixes:list[str], suffixes:list[str]):
         new_filename (str): A new filename
     '''
 
-    # Remove the file extension (works even if there is none present)
-    filename = filename.split('.')[0]
+    # Removes the file extension (works even if there is none present)
+    # Removes relative path
+    filename = os.path.basename(filename).split('.')[0]
 
     suff = '_'.join(suffixes)
     pref = '_'.join(prefixes)
