@@ -1,3 +1,4 @@
+import logging
 import sys
 import os
 import numpy as np
@@ -8,23 +9,28 @@ import argparse
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from find_circle import find_circle_for_center, find_ellipse
-from utils import visualisers
+from image_registration.find_circle import find_circle_for_center, find_ellipse
+from utils import pprint, visualisers
+from utils.filename_builder import create_out_filename
 
-parser = argparse.ArgumentParser(description='Estimating correlation between individual frames of the video matrix')
+def parse_args():
+    parser = argparse.ArgumentParser(description='Estimating correlation between individual frames of the video matrix')
 
-optional = parser._action_groups.pop()
-required = parser.add_argument_group('required arguments')
+    optional = parser._action_groups.pop()
+    required = parser.add_argument_group('required arguments')
 
-# Required arguments
-required.add_argument('-i', '--input', type=str, required=True, help='Path to the input video, can be .npy file or .mp4')
-required.add_argument('-d', '--displacement', type=str, required=True, help='Path to the displacement matrix')
+    # Required arguments
+    required.add_argument('-i', '--input', type=str, required=True, help='Path to the input video, can be .npy file or .mp4')
+    required.add_argument('-d', '--displacement', type=str, required=True, help='Path to the displacement matrix')
 
-optional.add_argument('-o', '--save_as', type=str, default=None, help='Name of the saved displacement matrix')
-parser._action_groups.append(optional)
+    optional.add_argument('-o', '--save_as', type=str, default=None, help='Name of the saved displacement matrix')
+    parser._action_groups.append(optional)
+    return parser.parse_args()
 
 def apply_displacement(image:np.ndarray, displacement:np.ndarray):
+    '''
+    Very slow, very bad function that applies a displacement map to an image. Not used currently
+    '''
     h, w = image.shape[-2:]
 
     x, y = np.meshgrid(np.arange(w), np.arange(h))
@@ -49,15 +55,15 @@ def apply_displacement(image:np.ndarray, displacement:np.ndarray):
 
     return warped_image
 
-def process_image(args):
+def _process_image(args):
     i, img, disp = args
     return i, apply_displacement(img, disp)
 
-def register_image_stack(img_stack, displacement):
+def _register_image_stack(img_stack, displacement):
     num_processes = cpu_count() // 2
     args = [(i, img_stack[i], displacement[..., i]) for i in range(img_stack.shape[0])]
     with Pool(processes=num_processes) as pool:
-        results = list(tqdm(pool.imap(process_image,args), total=img_stack.shape[0]))
+        results = list(tqdm(pool.imap(_process_image,args), total=img_stack.shape[0]))
 
     for i, result in results:
         img_stack[i] = result
@@ -65,6 +71,9 @@ def register_image_stack(img_stack, displacement):
     return img_stack
 
 def extract_medians(displacement:np.ndarray):
+    '''
+    Extracts medians from displacement. Creates one median displacement instead of NxM displacement.
+    '''
     medians = []
     for i in range(displacement.shape[-1]):
         x_med = np.median(displacement[0, :, :, i])
@@ -76,27 +85,34 @@ def extract_medians(displacement:np.ndarray):
     return meds
 
 def extract_means(displacement:np.ndarray):
+    '''
+    Extracts means from displacement. Creates one mean displacement instead of NxM displacement.
+    '''
     means = []
     for i in range(displacement.shape[-1]):
         x_mean = displacement[0, :, :, i].mean()
         y_mean = displacement[1, :, :, i].mean()
-        #x_med = np.median(displacement[0, :, :, i])
-        #y_med = np.median(displacement[1, :, :, i])
         means.append([x_mean, y_mean])
-        #means.append([x_med, y_med])
 
     means = np.array(means)
 
     return means
 
 def draw_means(means):
+    '''
+    Plots means/medians on a graph
+    '''
     plt.plot(means[:,0], means[:,1])
+    plt.xlabel('X displacement (px)')
+    plt.ylabel('Y displacement (px)')
+    plt.title('Mean displacement')
     plt.show()
 
 def shift_by_vector(image_stack, displacement, mesh):
     n, h, w = image_stack.shape
 
-    x_c, y_c = find_ellipse(displacement)
+    #x_c, y_c = find_ellipse(displacement) 
+    #  -> had some idea how to use this, might try it again later
     for i in tqdm(range(n)):
         image = image_stack[i]
         x_d, y_d = displacement[i]
@@ -137,33 +153,39 @@ def apply_transformations(video_frames:np.ndarray, mesh_nodes:np.ndarray, disp:n
 
 
 def main(args):
+    logging.basicConfig(level=logging.INFO, format='%(levelname)s:%(name)s: %(message)s')
+    logger = logging.getLogger(__name__)
+    pprint.pprint_argparse(args, logger)
+
     img_stack = np.load(args.input)[15:]
     data = np.load(args.displacement)
     displacement = data['displacement']
     mesh_nodes = data['mesh_nodes']
     displacement = displacement.squeeze()
+
     if (img_stack.shape[0] != displacement.shape[-1]):
-        print('Img stack shape does not match displacement shape')
-        print(f'Number of images: {img_stack.shape[0]} should be the same as the number of displacements: {displacement.shape[-1]}')
+        logging.error('Img stack shape does not match displacement shape')
+        logging.error(f'Number of images: {img_stack.shape[0]} should be the same as the number of displacements: {displacement.shape[-1]}')
         sys.exit()
 
     #means = extract_means(displacement)
     meds = extract_medians(displacement)
-    base_name = args.input.split('/')[-1].split('.')[0]
+    base_name = os.path.basename(args.input).split('.')[0]
     #img_stack = apply_transformations(img_stack, mesh_nodes, displacement)
 
     img_stack = shift_by_vector(img_stack, meds, mesh_nodes)
 
-    #img_stack = register_image_stack(img_stack, displacement)
+    # multithreaded with the bad function
+    #img_stack = _register_image_stack(img_stack, displacement)
 
     if args.save_as is None:
-        base_name = args.input.split('/')[-1].split('.')[0]
-        save_as = f'{base_name}_registered'
+        save_as = create_out_filename(base_name, [], ['registered'])
+        save_to = os.path.join('./npy_files', save_as)
     else:
-        save_as = args.save_as
-    np.save(save_as, img_stack)
+        save_to = args.save_as
+    np.save(save_to, img_stack)
 
 if __name__ == "__main__":
-    args = parser.parse_args()
+    args = parse_args()
     main(args)
 

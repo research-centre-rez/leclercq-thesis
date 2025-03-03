@@ -151,21 +151,21 @@ def main(args):
 
     if not args.rotate:
         save_as = filename_builder.create_out_filename(base_name, [], ['not', 'rotated'])
-        save_as = f'./npy_files/{save_as}'
+        save_to = os.path.join('./npy_files', save_as)
         create_video_matrix(vid_path=args.input,
                             grayscale=args.grayscale,
-                            save_as=save_as,
+                            save_as=save_to,
                             downscale_factor=args.downscale_factor)
 
     if args.rotate:
         save_as = filename_builder.create_out_filename(base_name, ['temp'], ['rotated'])
-        save_as = f'./npy_files/{save_as}'
+        save_to = os.path.join('./npy_files', save_as)
         out = create_video_matrix(vid_path=args.input,
                                   grayscale=args.grayscale,
                                   downscale_factor=args.downscale_factor)
         rotate_frames(frames=out,
                       center_offset=args.center_offset,
-                      save_as=save_as if args.save else None,
+                      save_as=save_to if args.save else None,
                       sampling_rate=args.sampling_rate)
 
 if __name__ == "__main__":

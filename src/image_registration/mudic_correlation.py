@@ -172,7 +172,8 @@ def main(args):
 
     if args.save_as is None:
         save_as = filename_builder.create_out_filename(base_name, [], ['displacement'])
-        np.savez(save_as, displacement=displacement, mesh_nodes=mesh_nodes)
+        save_to = os.path.join('./npy_files', save_as)
+        np.savez(save_to, displacement=displacement, mesh_nodes=mesh_nodes)
     else:
         np.savez(args.save_as, displacement=displacement, mesh_nodes=mesh_nodes)
 
