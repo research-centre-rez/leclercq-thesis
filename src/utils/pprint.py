@@ -6,5 +6,4 @@ def pprint_argparse(args, logger=None):
 
     logger.info('Running with the following parameters:')
     for arg in vars(args):
-        logger.info(f'  {arg}: {getattr(args,arg)}')
-
+        logger.info('  %s: %s', arg, getattr(args, arg))

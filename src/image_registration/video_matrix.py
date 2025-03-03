@@ -1,4 +1,5 @@
 #!/bin/python3
+from fileinput import filename
 import cv2 as cv
 import numpy as np
 import os
@@ -9,6 +10,7 @@ import logging
 
 from utils import visualisers
 from utils import pprint
+from utils import filename_builder
 
 def parse_args():
     # Argparse configuration
@@ -136,7 +138,7 @@ def create_video_matrix(vid_path:str, grayscale=True, save_as=None, downscale_fa
         # Cache the matrix
         if save_as:
             np.save(save_as, frames_np)
-        return frames_np
+    return frames_np
 
 def main(args):
 
@@ -148,21 +150,21 @@ def main(args):
     base_name = os.path.basename(args.input).split('.')[0]
 
     if not args.rotate:
+        save_as = filename_builder.create_out_filename(base_name, [], ['not', 'rotated'])
         create_video_matrix(vid_path=args.input,
                             grayscale=args.grayscale,
-                            save_as=f'{base_name}_not_rotated' if args.save else None,
+                            save_as=save_as,
                             downscale_factor=args.downscale_factor)
 
     if args.rotate:
+        save_as = filename_builder.create_out_filename(base_name, ['temp'], ['rotated'])
         out = create_video_matrix(vid_path=args.input,
                                   grayscale=args.grayscale,
                                   downscale_factor=args.downscale_factor)
         rotate_frames(frames=out,
                       center_offset=args.center_offset,
-                      save_as=f'temp_{base_name}_rotated' if args.save else None,
+                      save_as=save_as if args.save else None,
                       sampling_rate=args.sampling_rate)
-
-
 
 if __name__ == "__main__":
     args = parse_args()
