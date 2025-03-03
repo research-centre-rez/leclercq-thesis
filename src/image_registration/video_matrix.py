@@ -5,27 +5,31 @@ import os
 import sys
 from tqdm import tqdm
 import argparse
+import logging
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from utils import visualisers
+from utils import pprint
 
-# Argparse configuration
-argparser = argparse.ArgumentParser(description='Creating a video matrix and rotating it')
+def parse_args():
+    # Argparse configuration
+    argparser = argparse.ArgumentParser(description='Creating a video matrix and rotating it')
 
-optional = argparser._action_groups.pop()
-req = argparser.add_argument_group('required arguments')
+    optional = argparser._action_groups.pop()
+    req = argparser.add_argument_group('required arguments')
 
-# Required arguments
-req.add_argument('-i', '--input', type=str, help='Path to the input video', required=True)
-req.add_argument('--rotate', action=argparse.BooleanOptionalAction, help='Whether to register each frame onto the starting frame', required=True)
+    # Required arguments
+    req.add_argument('-i', '--input', type=str, help='Path to the input video', required=True)
+    req.add_argument('--rotate', action=argparse.BooleanOptionalAction, help='Whether to register each frame onto the starting frame', required=True)
 
-# Optional arguments
-optional = argparser.add_argument_group('optional arguments')
-optional.add_argument('--save', action=argparse.BooleanOptionalAction, help='Save the rotated video matrix into a .npy file, if --no-rotate is parsed then the non-rotated video matrix is saved into a .npy file. File name will be the same as the video filename.')
-optional.add_argument('-gs', '--grayscale', default=True, action=argparse.BooleanOptionalAction, help='Use grayscale video or not. It is recommended to use grayscale as it uses 1/3 of the storage.')
-optional.add_argument('-ds', '--downscale_factor',default=2, type=int, help='How much the video should be downscaled. Has to be an integer')
-optional.add_argument('-co', '--center_offset', default=(14.08033127, 19.36611469), type=float, nargs=2, help='Custom center_offset')
-optional.add_argument('-sr', '--sampling_rate', default=1, type=int, help='Sampling rate for the rotation')
+    # Optional arguments
+    optional = argparser.add_argument_group('optional arguments')
+    optional.add_argument('--save', action=argparse.BooleanOptionalAction, help='Save the rotated video matrix into a .npy file, if --no-rotate is parsed then the non-rotated video matrix is saved into a .npy file. File name will be the same as the video filename.')
+    optional.add_argument('-gs', '--grayscale', default=True, action=argparse.BooleanOptionalAction, help='Use grayscale video or not. It is recommended to use grayscale as it uses 1/3 of the storage.')
+    optional.add_argument('-ds', '--downscale_factor',default=2, type=int, help='How much the video should be downscaled. Has to be an integer')
+    optional.add_argument('-co', '--center_offset', default=(14.08033127, 19.36611469), type=float, nargs=2, help='Custom center_offset')
+    optional.add_argument('-sr', '--sampling_rate', default=1, type=int, help='Sampling rate for the rotation')
+
+    return argparser.parse_args()
 
 
 def tqdm_generator():
@@ -125,21 +129,23 @@ def create_video_matrix(vid_path:str, grayscale=True, save_as=None, downscale_fa
             cap.release()
             break
 
-    frames = np.array(frames)
-    cap.release()
-
-    # Cache the matrix
-    if save_as:
-        np.save(save_as, frames)
-    return np.array(frames)
+    frames_np = np.array(frames)
+    try:
+        cap.release()
+    finally:
+        # Cache the matrix
+        if save_as:
+            np.save(save_as, frames_np)
+        return frames_np
 
 def main(args):
 
-    print('Running with the following parameters:')
-    for arg in vars(args):
-        print(f'  {arg}: {getattr(args,arg)}')
+    logging.basicConfig(level=logging.INFO, format='%(levelname)s:%(name)s: %(message)s')
+    logger = logging.getLogger(__name__)
+    pprint.pprint_argparse(args, logger)
 
-    base_name = args.input.split('/')[-1].split('.')[0]
+    # Removing .mp4 extension
+    base_name = os.path.basename(args.input).split('.')[0]
 
     if not args.rotate:
         create_video_matrix(vid_path=args.input,
@@ -159,5 +165,5 @@ def main(args):
 
 
 if __name__ == "__main__":
-    args = argparser.parse_args()
+    args = parse_args()
     main(args)
