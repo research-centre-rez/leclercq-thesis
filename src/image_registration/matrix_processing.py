@@ -42,7 +42,7 @@ def create_histogram(image, save_as):
     name = os.path.basename(save_as).split('_hist')[0]
 
     plt.figure()
-    plt.title(f'Histogram of masked Max-Min image for {name}')
+    plt.title(f'Histogram of masked image for {name}')
     plt.xlabel('Pixel intensity')
     plt.ylabel('Frequency')
     plt.bar(bins[:-1], hist, width=1, align='center')
@@ -105,16 +105,22 @@ def main(args):
         max_min = reps.get('max_minus_min', max_image(vid_mat) - min_image(vid_mat))
         masked_maxmin = mask_img_with_min(to_mask=max_min, min_img=reps.get('min', min_image(vid_mat)))
         reps['masked_maxmin'] = masked_maxmin
-        save_as = filename_builder.create_out_filename(base_name, [], ['hist'])
-        save_to = os.path.join('./images', save_as)
-        create_histogram(masked_maxmin, save_to)
+        save_as = filename_builder.create_out_filename(f'./images/{base_name}', [], ['hist'])
+        create_histogram(masked_maxmin, save_as)
 
     if 'variance' in args.representations:
-        reps['variance'] = variance_image(vid_mat)
+        var_img          = variance_image(vid_mat)
+        reps['variance'] = var_img
+        if 'min' in args.representations:
+            masked_var = mask_img_with_min(to_mask=var_img, min_img=reps.get('min', min_image(vid_mat)))
+            reps['masked_variance'] = masked_var
+            save_as = filename_builder.create_out_filename(f'./images/{base_name}', [], ['variance', 'hist'])
+            create_histogram(masked_var, save_as)
+
 
     for key, value in reps.items():
         # Variance image can have values higher than 255, therefore we don't convert it to RGB
-        if key == 'variance':
+        if 'variance' in key:
             continue
         reps[key] = gray_to_rgb(value)
 

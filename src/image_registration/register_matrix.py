@@ -9,8 +9,8 @@ import argparse
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 
-from image_registration.find_circle import find_circle_for_center, find_ellipse
-from utils import pprint, visualisers
+from image_registration.disp_utils import extract_medians, extract_means
+from utils import pprint
 from utils.filename_builder import create_out_filename
 
 def parse_args():
@@ -69,34 +69,6 @@ def _register_image_stack(img_stack, displacement):
         img_stack[i] = result
 
     return img_stack
-
-def extract_medians(displacement:np.ndarray):
-    '''
-    Extracts medians from displacement. Creates one median displacement instead of NxM displacement.
-    '''
-    medians = []
-    for i in range(displacement.shape[-1]):
-        x_med = np.median(displacement[0, :, :, i])
-        y_med = np.median(displacement[1, :, :, i])
-        medians.append([x_med, y_med])
-
-    meds = np.array(medians)
-
-    return meds
-
-def extract_means(displacement:np.ndarray):
-    '''
-    Extracts means from displacement. Creates one mean displacement instead of NxM displacement.
-    '''
-    means = []
-    for i in range(displacement.shape[-1]):
-        x_mean = displacement[0, :, :, i].mean()
-        y_mean = displacement[1, :, :, i].mean()
-        means.append([x_mean, y_mean])
-
-    means = np.array(means)
-
-    return means
 
 def draw_means(means):
     '''
@@ -168,15 +140,11 @@ def main(args):
         logging.error(f'Number of images: {img_stack.shape[0]} should be the same as the number of displacements: {displacement.shape[-1]}')
         sys.exit()
 
-    #means = extract_means(displacement)
     meds = extract_medians(displacement)
-    base_name = os.path.basename(args.input).split('.')[0]
-    #img_stack = apply_transformations(img_stack, mesh_nodes, displacement)
+    _, name = os.path.split(args.input)
+    base_name, _ = os.path.splitext(name)
 
     img_stack = shift_by_vector(img_stack, meds, mesh_nodes)
-
-    # multithreaded with the bad function
-    #img_stack = _register_image_stack(img_stack, displacement)
 
     if args.save_as is None:
         save_to = create_out_filename(f'./npy_files/{base_name}', [], ['registered'])

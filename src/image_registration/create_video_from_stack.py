@@ -6,8 +6,8 @@ import os
 import sys
 from tqdm import tqdm
 
-from image_registration.find_circle import find_ellipse
-from image_registration.register_matrix import extract_medians
+from image_registration.find_rotation_center import fit_ellipse
+from image_registration.disp_utils import extract_medians
 from utils.filename_builder import create_out_filename, append_file_extension
 from utils.loaders import load_npz_disp
 
@@ -43,7 +43,7 @@ def create_video_from_stack(image_stack, disp, mesh, sample_name):
         center_h = h // 2
         center_w = w // 2
 
-        rot_centre_x, rot_centre_y = find_ellipse(extract_medians(disp))
+        rot_centre_x, rot_centre_y = fit_ellipse(extract_medians(disp))
         rot_centre_x = int(center_w + rot_centre_x)
         rot_centre_y = int(center_h + rot_centre_y)
 
