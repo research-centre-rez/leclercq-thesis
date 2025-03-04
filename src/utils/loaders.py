@@ -6,6 +6,7 @@ import cv2 as cv
 from torchvision.transforms import v2
 import torchvision.transforms
 from PIL import Image
+import numpy as np
 
 # Leclercq's util functions
 
@@ -69,3 +70,20 @@ def load_img_to_tensor(img_path, std, mean, resize=None, device='cpu') -> torch.
     image = (image - mean) / std # Normalise image
 
     return image
+
+def load_npz_disp(dsp_path:str, squeeze:bool) -> tuple[np.ndarray,np.ndarray]:
+    '''
+    Loads a .npz file into memory. Displacement can already be squeezed here instead of always doing it after the file is loaded.
+    Args:
+        dsp_path (str): Path to the displacement file, should be a .npz
+        squeeze (bool): Whether the displacement should be squeezed
+    '''
+    data = np.load(dsp_path)
+    disp = data['displacement']
+    mesh = data['mesh_nodes']
+
+    if squeeze:
+        disp = disp.squeeze()
+
+    return disp,mesh
+

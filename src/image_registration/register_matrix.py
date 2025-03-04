@@ -179,8 +179,7 @@ def main(args):
     #img_stack = _register_image_stack(img_stack, displacement)
 
     if args.save_as is None:
-        save_as = create_out_filename(base_name, [], ['registered'])
-        save_to = os.path.join('./npy_files', save_as)
+        save_to = create_out_filename(f'./npy_files/{base_name}', [], ['registered'])
     else:
         save_to = args.save_as
     np.save(save_to, img_stack)

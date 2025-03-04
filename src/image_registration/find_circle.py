@@ -5,17 +5,6 @@ import matplotlib.pyplot as plt
 from skimage.measure import EllipseModel
 import sys
 
-
-#31.14389212,  5.11694245 +
-#14.08033127, 19.36611469
-#------------------------
-#45.22422339, 24.48305714
-
-#62.28778424 10.2338849
-#76.36811551 29.59999959
-
-#66.73625786721902
-
 def plot_ellipse(disp, xc,yc,a,b,theta):
     fig, ax = plt.subplots()
     ax.plot(disp[:,0], disp[:,1], 'bo', label='Data')
@@ -40,11 +29,9 @@ def find_ellipse(disp:np.ndarray):
         sys.exit()
 
     xc, yc, _, _, _ = model.params
-    plot_ellipse(disp, *model.params)
+    #plot_ellipse(disp, *model.params)
     print(f'Center of ellipse: {(xc,yc)}')
     return xc,yc
-
-
 
 def find_circle_for_center(displacement:np.ndarray, mesh_nodes:np.ndarray):
     '''

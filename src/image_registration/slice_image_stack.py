@@ -61,10 +61,8 @@ def main(args):
 
     gallery = process_image_stack(img_stack, FRAME_STEP)
 
-    new_filename = filename_builder.create_out_filename(args.input, prefixes=[], suffixes=['slices'])
-    save_to = os.path.join('./images', new_filename)
-    os.makedirs('./images', exist_ok=True)
-    visualisers.imshow(save_to, **gallery)
+    new_filename = filename_builder.create_out_filename(f'./images/{args.input}', prefixes=[], suffixes=['slices'])
+    visualisers.imshow(new_filename, **gallery)
 
 if __name__ == "__main__":
     args = parse_args()

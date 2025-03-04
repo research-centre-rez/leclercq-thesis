@@ -1,14 +1,11 @@
-#!/bin/python3
-from fileinput import filename
-import cv2 as cv
-import numpy as np
 import os
 import sys
-from tqdm import tqdm
 import argparse
 import logging
+import cv2 as cv
+import numpy as np
+from tqdm import tqdm
 
-from utils import visualisers
 from utils import pprint
 from utils import filename_builder
 
@@ -150,22 +147,20 @@ def main(args):
     base_name = os.path.basename(args.input).split('.')[0]
 
     if not args.rotate:
-        save_as = filename_builder.create_out_filename(base_name, [], ['not', 'rotated'])
-        save_to = os.path.join('./npy_files', save_as)
+        save_as = filename_builder.create_out_filename(f'./npy_files/{base_name}', [], ['not', 'rotated'])
         create_video_matrix(vid_path=args.input,
                             grayscale=args.grayscale,
-                            save_as=save_to,
+                            save_as=save_as,
                             downscale_factor=args.downscale_factor)
 
     if args.rotate:
-        save_as = filename_builder.create_out_filename(base_name, ['temp'], ['rotated'])
-        save_to = os.path.join('./npy_files', save_as)
+        save_as = filename_builder.create_out_filename(f'./npy_files/{base_name}', ['temp'], ['rotated'])
         out = create_video_matrix(vid_path=args.input,
                                   grayscale=args.grayscale,
                                   downscale_factor=args.downscale_factor)
         rotate_frames(frames=out,
                       center_offset=args.center_offset,
-                      save_as=save_to if args.save else None,
+                      save_as=save_as if args.save else None,
                       sampling_rate=args.sampling_rate)
 
 if __name__ == "__main__":
