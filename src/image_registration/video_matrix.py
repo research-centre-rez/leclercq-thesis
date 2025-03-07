@@ -27,6 +27,8 @@ def parse_args():
     optional.add_argument('-ds', '--downscale_factor',default=2, type=int, help='How much the video should be downscaled. Has to be an integer')
     optional.add_argument('-co', '--center_offset', default=(14.08033127, 19.36611469), type=float, nargs=2, help='Custom center_offset')
     optional.add_argument('-sr', '--sampling_rate', default=1, type=int, help='Sampling rate for the rotation')
+    optional.add_argument('-p', '--prefix', type=str, nargs='*', help='Prefixes for the saved file')
+    optional.add_argument('-s', '--suffix', type=str, nargs='*', help='Suffixes for the saved file')
 
     return argparser.parse_args()
 
@@ -47,6 +49,7 @@ def rotate_frames(frames, center_offset=(14.08033127, 19.36611469), save_as=None
             print(e)
             sys.exit(-1)
 
+    logger = logging.getLogger(__name__)
     # Calculate rotation centre
     h,w = frames[0].shape
 
@@ -57,12 +60,12 @@ def rotate_frames(frames, center_offset=(14.08033127, 19.36611469), save_as=None
     img_center = np.array(frames[0].shape[:2][::-1]) / 2
     rot_center = img_center + c_offset
 
-    print(f'Image center: {img_center}')
-    print(f'Rotation center: {rot_center}')
+    logger.info(f'Image center: {img_center}')
+    logger.info(f'Rotation center: {rot_center}')
 
     # Rotation between each frame
     #rot_per_frame = 0.1851 # from jupyter notebook
-    rot_per_frame = 0.1491 # from training data
+    rot_per_frame = np.float32(0.14915) # from training data
     rots = np.array([np.round(rot_per_frame * i, 5) for i in range(frames.shape[0])])
 
     for i,(frame, rotation) in enumerate(tqdm(zip(frames, rots), total=frames.shape[0])):
@@ -147,14 +150,18 @@ def main(args):
     base_name = os.path.basename(args.input).split('.')[0]
 
     if not args.rotate:
-        save_as = filename_builder.create_out_filename(f'./npy_files/{base_name}', [], ['not', 'rotated'])
+        save_as = filename_builder.create_out_filename(f'./npy_files/{base_name}',
+                                                       args.prefix,
+                                                       ['not', 'rotated'] + (args.suffix))
         create_video_matrix(vid_path=args.input,
                             grayscale=args.grayscale,
                             save_as=save_as,
                             downscale_factor=args.downscale_factor)
 
     if args.rotate:
-        save_as = filename_builder.create_out_filename(f'./npy_files/{base_name}', ['temp'], ['rotated'])
+        save_as = filename_builder.create_out_filename(f'./npy_files/{base_name}',
+                                                       args.prefix,
+                                                       ['rotated'] + (args.suffix))
         out = create_video_matrix(vid_path=args.input,
                                   grayscale=args.grayscale,
                                   downscale_factor=args.downscale_factor)

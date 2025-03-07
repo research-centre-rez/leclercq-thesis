@@ -49,6 +49,7 @@ def process_image_stack(img_stack:np.ndarray, frame_step:int):
     return gallery
 
 def main(args):
+
     img_stack = np.load(args.input)
 
     logging.basicConfig(level=logging.INFO, format='%(levelname)s:%(name)s: %(message)s')
@@ -61,7 +62,10 @@ def main(args):
 
     gallery = process_image_stack(img_stack, FRAME_STEP)
 
-    new_filename = filename_builder.create_out_filename(f'./images/{args.input}', prefixes=[], suffixes=['slices'])
+    path, name = os.path.split(args.input)
+    base, _    = os.path.splitext(name)
+    new_filename = filename_builder.create_out_filename(f'./images/{base}', prefixes=[], suffixes=['slices'])
+    print(new_filename)
     visualisers.imshow(new_filename, **gallery)
 
 if __name__ == "__main__":

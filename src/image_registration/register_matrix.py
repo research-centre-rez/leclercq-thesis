@@ -7,11 +7,14 @@ from scipy.interpolate import griddata
 from multiprocessing import Pool, cpu_count
 import argparse
 import matplotlib.pyplot as plt
+from skimage.transform import estimate_transform
 from tqdm import tqdm
 
 from image_registration.disp_utils import extract_medians, extract_means
+from image_registration.find_rotation_center import fit_ellipse
 from utils import pprint
 from utils.filename_builder import create_out_filename
+from utils.loaders import load_npz_disp
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Estimating correlation between individual frames of the video matrix')
@@ -83,16 +86,14 @@ def draw_means(means):
 def shift_by_vector(image_stack, displacement, mesh):
     n, h, w = image_stack.shape
 
-    #x_c, y_c = find_ellipse(displacement) 
-    #  -> had some idea how to use this, might try it again later
+    x_c, y_c = fit_ellipse(displacement) 
+    
     for i in tqdm(range(n)):
         image = image_stack[i]
         x_d, y_d = displacement[i]
-        #x_d = x_c - x_d
-        #y_d = y_c - y_d
 
-        T = np.array([[1, 0, -x_d],
-                      [0, 1, -y_d]])
+        T = np.array([[1, 0, -x_d + x_c],
+                      [0, 1, -y_d + y_c]])
 
         im_translated = cv.warpAffine(image, T, (w,h))
         image_stack[i] = im_translated
@@ -100,19 +101,29 @@ def shift_by_vector(image_stack, displacement, mesh):
     return image_stack
 
 def compute_affine_transform(mesh_nodes:np.ndarray, disp:np.ndarray, frame_idx:int):
+    logger = logging.getLogger(__name__)
     src_pts = mesh_nodes.copy()
 
-    dx = -disp[0, :, :, frame_idx].flatten()
-    dy = -disp[1, :, :, frame_idx].flatten()
+    dx = disp[0, :, :, frame_idx].flatten()
+    dy = disp[1, :, :, frame_idx].flatten()
 
-    dst_pts = np.stack([src_pts[:,0] + dx, src_pts[:,1] + dy], axis=-1)
+    dst_pts = np.stack([src_pts[:,0] + dx, src_pts[:,1] - dy], axis=-1)
 
-    A, _ = cv.estimateAffine2D(src_pts, dst_pts, method=cv.RANSAC)
-    return A
+    logger.debug(f'source pts:\n {src_pts}')
+    logger.debug(f'------------')
+    logger.debug(f'dest pts:\n {dst_pts}')
+
+    #A, _ = cv.estimateAffinePartial2D(dst_pts, src_pts, method=cv.RANSAC)
+    #return A
+    A = estimate_transform('euclidean', dst_pts, src_pts)
+    logger.debug('A: \n %s',A.params[:2])
+    logger.debug('A shape: %s',A.params[:2].shape)
+
+    return A.params[:2]
 
 def apply_transformations(video_frames:np.ndarray, mesh_nodes:np.ndarray, disp:np.ndarray):
     n,h,w = video_frames.shape
-    for frame_id in tqdm(range(n), desc='Registering'):
+    for frame_id in tqdm(range(n), desc='Reg via affine'):
         affine_mat = compute_affine_transform(mesh_nodes, disp, frame_id)
         if affine_mat is not None:
             transformed = cv.warpAffine(video_frames[frame_id], affine_mat, (w, h))
@@ -123,17 +134,13 @@ def apply_transformations(video_frames:np.ndarray, mesh_nodes:np.ndarray, disp:n
 
     return video_frames
 
-
 def main(args):
-    logging.basicConfig(level=logging.INFO, format='%(levelname)s:%(name)s: %(message)s')
+    logging.basicConfig(level=logging.DEBUG, format='%(levelname)s:%(name)s: %(message)s')
     logger = logging.getLogger(__name__)
     pprint.pprint_argparse(args, logger)
 
     img_stack = np.load(args.input)[15:]
-    data = np.load(args.displacement)
-    displacement = data['displacement']
-    mesh_nodes = data['mesh_nodes']
-    displacement = displacement.squeeze()
+    displacement, mesh_nodes = load_npz_disp(args.displacement, squeeze=True)
 
     if (img_stack.shape[0] != displacement.shape[-1]):
         logging.error('Img stack shape does not match displacement shape')
@@ -141,10 +148,12 @@ def main(args):
         sys.exit()
 
     meds = extract_medians(displacement)
+
     _, name = os.path.split(args.input)
     base_name, _ = os.path.splitext(name)
 
     img_stack = shift_by_vector(img_stack, meds, mesh_nodes)
+    #img_stack = apply_transformations(img_stack, mesh_nodes, displacement)
 
     if args.save_as is None:
         save_to = create_out_filename(f'./npy_files/{base_name}', [], ['registered'])

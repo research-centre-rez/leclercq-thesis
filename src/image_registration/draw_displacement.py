@@ -1,5 +1,6 @@
 import logging
 import os
+import sys
 import numpy as np
 import matplotlib.cm as cm
 import matplotlib.pyplot as plt
@@ -19,6 +20,7 @@ def parse_args():
     optional = parser.add_argument_group('optional arguments')
     optional.add_argument('--show', default=False, action=argparse.BooleanOptionalAction, help='Show the displacement in a GUI')
     optional.add_argument('--save', default=False, action=argparse.BooleanOptionalAction, help='Whether to save the final graph')
+    optional.add_argument('--first_n', type=int, help='Whether to save the final graph')
     return parser.parse_args()
 
 def draw_displacement(displacement:np.ndarray, grid:np.ndarray, sample_name:str, show:bool, save:bool) -> None:
@@ -99,6 +101,9 @@ def main(args):
     displacement = data['displacement']
     mesh_nodes   = data['mesh_nodes']
     base_name    = os.path.basename(args.input).split('_displacement')[0]
+
+    if args.first_n:
+        displacement = displacement[...,:args.first_n]
 
     draw_displacement(displacement, mesh_nodes, base_name, args.show, args.save)
 

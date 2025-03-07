@@ -19,7 +19,7 @@ def parse_args():
     required.add_argument('-i', '--input', required=True, help='Path to .npy image stack file')
 
     optional = parser.add_argument_group('optional arguments')
-    optional.add_argument('--disp_path', default=None, help='Path to the .npz displacement file')
+    optional.add_argument('-d', '--disp_path', default=None, help='Path to the .npz displacement file')
     return parser.parse_args()
 
 def create_video_from_stack(image_stack, disp, mesh, sample_name):
