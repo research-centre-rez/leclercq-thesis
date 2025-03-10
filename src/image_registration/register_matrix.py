@@ -88,7 +88,7 @@ def shift_by_vector(image_stack, displacement, mesh):
 
     x_c, y_c = fit_ellipse(displacement) 
     
-    for i in tqdm(range(n)):
+    for i in tqdm(range(n), desc='Registering by shift'):
         image = image_stack[i]
         x_d, y_d = displacement[i]
 
