@@ -8,6 +8,7 @@ from tqdm import tqdm
 
 from utils import pprint
 from utils import filename_builder
+from utils.tqdm_utils import tqdm_generator
 
 def parse_args():
     # Argparse configuration
@@ -33,23 +34,17 @@ def parse_args():
     return argparser.parse_args()
 
 
-def tqdm_generator():
-    '''
-    Simple tqdm generator that allows the use of tqdm with a while loop.
-    '''
-    while True:
-        yield
 
 def rotate_frames(frames, center_offset=(14.08033127, 19.36611469), save_as=None, sampling_rate=1) -> np.ndarray:
-    if type(frames) == str:
+    logger = logging.getLogger(__name__)
+    if isinstance(frames, str):
         try:
             frames = np.load(frames)
         except OSError as e:
-            print('Could not load the .npy file, please try again')
-            print(e)
+            logger.error('Could not load the .npy file, please try again')
+            logger.error(e)
             sys.exit(-1)
 
-    logger = logging.getLogger(__name__)
     # Calculate rotation centre
     h,w = frames[0].shape
 
@@ -60,12 +55,13 @@ def rotate_frames(frames, center_offset=(14.08033127, 19.36611469), save_as=None
     img_center = np.array(frames[0].shape[:2][::-1]) / 2
     rot_center = img_center + c_offset
 
-    logger.info(f'Image center: {img_center}')
-    logger.info(f'Rotation center: {rot_center}')
+    logger.info('Image center: %s', img_center)
+    logger.info('Rotation center: %s', rot_center)
 
     # Rotation between each frame
     #rot_per_frame = 0.1851 # from jupyter notebook
-    rot_per_frame = np.float32(0.14815) # from training data
+    #rot_per_frame = np.float32(0.14815) # from training data
+    rot_per_frame = np.float32(0.14798) # from training data
     rots = np.array([np.round(rot_per_frame * i, 5) for i in range(frames.shape[0])])
 
     for i,(frame, rotation) in enumerate(tqdm(zip(frames, rots), total=frames.shape[0])):

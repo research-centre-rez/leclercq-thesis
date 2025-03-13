@@ -5,6 +5,7 @@ import logging
 import numpy as np
 import cv2 as cv
 import matplotlib.pyplot as plt
+from skimage.transform import estimate_transform
 
 from image_registration.register_matrix import compute_affine_transform
 from utils import pprint
@@ -24,6 +25,43 @@ def parse_args():
     optional.add_argument('--save', default=False, action=argparse.BooleanOptionalAction, help='Whether to save the final graph')
     return parser.parse_args()
 
+def display_affine_for_OF(opt_flow, idx:int, graph_config=None) -> None:
+
+    if graph_config is None:
+        graph_config = {
+            'title': f'Affine transformation for index {idx}',
+            'save_as': None,
+            'show': True
+        }
+    fixed  = opt_flow[:, 0,   :] # Registering to these points
+    moving = opt_flow[:, idx, :]
+
+    fixed  = fixed.astype(np.float32)
+    moving = moving.astype(np.float32)
+
+    print(fixed.shape) #(18,2)
+    print(moving.shape) #(18,2)
+
+    #T = estimate_transform('euclidean', moving, fixed)
+    T, _ = cv.estimateAffinePartial2D(moving, fixed, method=cv.RANSAC)
+
+    ones    = np.ones((moving.shape[0], 1))
+    mov_hom = np.hstack([moving, ones])
+    mov_T   = (T @ mov_hom.T).T
+
+    plt.scatter(fixed[:, 0], fixed[:, 1], label="Original Points", alpha=0.5)
+    plt.scatter(moving[:, 0], moving[:, 1], label="Displaced Points", alpha=0.5)
+    plt.scatter(mov_T[:, 0], mov_T[:, 1], label="Transformed Points", alpha=0.5)
+    plt.plot()
+    plt.legend()
+    plt.title(graph_config['title'])
+
+    if graph_config['save_as']:
+        plt.savefig(graph_config['save_as'])
+    if graph_config['show']:
+        plt.show()
+
+    plt.close()
 def display_affine_for_point(disp:np.ndarray, mesh:np.ndarray, idx:int, graph_config:dict[str,str]) -> None:
     '''
     Displays how keypoints are mapped for a single frame (starting frame vs given frame).
@@ -36,6 +74,13 @@ def display_affine_for_point(disp:np.ndarray, mesh:np.ndarray, idx:int, graph_co
         None
 
     '''
+    if graph_config is None:
+        graph_config = {
+            'title': f'Affine transformation for index {idx}',
+            'save_as': 'Affine check',
+            'show': True
+        }
+
     mesh_time_t = disp[...,idx]
     x_mesh      = mesh_time_t[0].flatten()
     y_mesh      = -mesh_time_t[1].flatten() # y=0 at the top
