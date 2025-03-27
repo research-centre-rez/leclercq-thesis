@@ -7,7 +7,7 @@ import sys
 from tqdm import tqdm
 
 from image_registration.find_rotation_center import fit_ellipse
-from image_registration.disp_utils import extract_medians
+from utils.disp_utils import extract_medians
 from utils.filename_builder import create_out_filename, append_file_extension
 from utils.loaders import load_npz_disp
 

@@ -1,5 +1,8 @@
 import logging
 
+"""
+This file contains various pretty print methods for different data types
+"""
 def pprint_argparse(args, logger=None):
     if logger is None:
         logger = logging.getLogger(__name__)

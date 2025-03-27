@@ -133,6 +133,7 @@ def process_videos(directory_path):
         for file in failed_files:
             log_file.write(file + '\n')
 
+# TODO: Add argparse functionalities
 if __name__ == "__main__":
     vid_path = '../../data/calibration_video.MP4'
     out = './calibration_video/'

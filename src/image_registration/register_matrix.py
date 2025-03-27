@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 from skimage.transform import estimate_transform
 from tqdm import tqdm
 
-from image_registration.disp_utils import extract_medians, extract_means
+from utils.disp_utils import extract_medians, extract_means
 from image_registration.find_rotation_center import fit_ellipse
 from utils import pprint
 from utils.filename_builder import create_out_filename
@@ -152,8 +152,8 @@ def main(args):
     _, name = os.path.split(args.input)
     base_name, _ = os.path.splitext(name)
 
-    img_stack = shift_by_vector(img_stack, meds, mesh_nodes)
-    #img_stack = apply_transformations(img_stack, mesh_nodes, displacement)
+    #img_stack = shift_by_vector(img_stack, meds, mesh_nodes)
+    img_stack = apply_transformations(img_stack, mesh_nodes, displacement)
 
     if args.save_as is None:
         save_to = create_out_filename(f'./npy_files/{base_name}', [], ['registered'])
@@ -164,4 +164,3 @@ def main(args):
 if __name__ == "__main__":
     args = parse_args()
     main(args)
-

@@ -8,7 +8,7 @@ import segmentation_models_pytorch as smp
 from torchvision.transforms import v2
 from PIL import Image
 import torchvision.transforms
-import torch_preprocess
+#import torch_preprocess
 
 def sirotenko_model():
     """

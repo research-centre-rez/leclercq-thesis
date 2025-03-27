@@ -34,6 +34,62 @@ def parse_args():
     return argparser.parse_args()
 
 
+def rotate_frames_optical_flow(video_path, angles):
+
+    logger = logging.getLogger(__name__)
+
+    cap = cv.VideoCapture(video_path)
+    if not cap.isOpened():
+        logger.error(f'Error: Could not open file {video_path}')
+        return None
+    
+    ret, frame = cap.read()
+    if not ret:
+        logger.error('Error with reading the first frame')
+        return None
+
+    rot_x      = 1870.1321
+    rot_y      = 1074.0583
+    rot_center = (rot_x, rot_y)
+
+    w = int(cap.get(cv.CAP_PROP_FRAME_WIDTH))
+    h = int(cap.get(cv.CAP_PROP_FRAME_HEIGHT))
+
+    cap.set(cv.CAP_PROP_POS_FRAMES, 0)
+
+    out_w = 1920
+    out_h = 1080
+    fourcc = cv.VideoWriter_fourcc(*'mp4v')  # or 'XVID'
+    out = cv.VideoWriter('./test_video.mp4', fourcc, 35, (out_w, out_h))
+
+    angle_idx = 0
+    angle     = np.float64(0.0)
+
+    print(len(angles))
+    print(cap.get(cv.CAP_PROP_FRAME_COUNT))
+    frame_counter = tqdm(desc='Creating new video')
+    for _ in tqdm_generator():
+        ret, frame = cap.read()
+
+        if not ret or angle_idx >= len(angles):
+            break
+
+        angle         += angles[angle_idx]
+        M             = cv.getRotationMatrix2D(center=rot_center, angle=angle, scale=1)
+        rotated_frame = cv.warpAffine(frame, M, (w,h))
+
+        frame_counter.set_postfix(angle=f'{angle:.4f}')
+
+        scaled_frame = cv.resize(rotated_frame, (out_w, out_h))
+        angle_idx    += 1
+
+        frame_counter.update(1)
+        out.write(scaled_frame)
+
+    out.release()
+    cap.release()
+    cv.destroyAllWindows()
+    print('Video successfully created')
 
 def rotate_frames(frames, center_offset=(14.08033127, 19.36611469), save_as=None, sampling_rate=1) -> np.ndarray:
     logger = logging.getLogger(__name__)
@@ -87,7 +143,7 @@ def rotate_frames(frames, center_offset=(14.08033127, 19.36611469), save_as=None
 
     return frames
 
-def create_video_matrix(vid_path:str, grayscale=True, save_as=None, downscale_factor = 2) -> np.ndarray:
+def create_video_matrix(vid_path:str, grayscale=True, save_as=None, downscale_factor=2, sampling_rate=1) -> np.ndarray:
     '''
     This function loads a video into a matrix where each row is a frame in the video. There is an option to save the matrix as a `.npy` file. If the video is too large to fit into memory, it can be further downscaled with the `downscale_factor` parameter.
 
@@ -128,6 +184,11 @@ def create_video_matrix(vid_path:str, grayscale=True, save_as=None, downscale_fa
             break
 
     frames_np = np.array(frames)
+    if sampling_rate != 1:
+        indices   = np.array(range(0, len(frames_np), sampling_rate))
+        frames_np = frames_np[tuple(indices.T), :]
+
+
     try:
         cap.release()
     finally:
@@ -152,7 +213,8 @@ def main(args):
         create_video_matrix(vid_path=args.input,
                             grayscale=args.grayscale,
                             save_as=save_as,
-                            downscale_factor=args.downscale_factor)
+                            downscale_factor=args.downscale_factor,
+                            sampling_rate=args.sampling_rate)
 
     if args.rotate:
         save_as = filename_builder.create_out_filename(f'./npy_files/{base_name}',

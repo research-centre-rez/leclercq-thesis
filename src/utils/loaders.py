@@ -86,4 +86,3 @@ def load_npz_disp(dsp_path:str, squeeze:bool) -> tuple[np.ndarray,np.ndarray]:
         disp = disp.squeeze()
 
     return disp,mesh
-

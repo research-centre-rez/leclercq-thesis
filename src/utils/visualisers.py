@@ -83,7 +83,7 @@ def plot_optical_flow(trajectories:list[np.ndarray], metrics:dict, graph_config:
 
     # Plot 1: X jitter over time for few sample trajectories
     ax1 = fig.add_subplot(221)
-    for i, tm in enumerate(metrics["trajectories"][:5]):  # Plot first 5 trajectories
+    for i, tm in enumerate(metrics["trajectories"][:7]):  # Plot first few trajectories
         ax1.plot(tm["frames"], tm["x_jitter"], '-', label=f'Point {i+1}')
 
     ax1.set_title('X Jitter Over Time')
@@ -93,7 +93,7 @@ def plot_optical_flow(trajectories:list[np.ndarray], metrics:dict, graph_config:
 
     # Plot 2: Y jitter over time for few sample trajectories
     ax2 = fig.add_subplot(222)
-    for i, tm in enumerate(metrics["trajectories"][:5]):  # Plot first 3 trajectories
+    for i, tm in enumerate(metrics["trajectories"][:7]):  # Plot first few trajectories
         ax2.plot(tm["frames"], tm["y_jitter"], '-', label=f'Point {i+1}')
 
     ax2.set_title('Y Jitter Over Time')
@@ -170,10 +170,10 @@ def draw_optical_flow_video(video_path, trajectories, output_path=None):
 
     # Get video properties
     #fps = cap.get(cv.CAP_PROP_FPS)
-    width = int(cap.get(cv.CAP_PROP_FRAME_WIDTH))
-    height = int(cap.get(cv.CAP_PROP_FRAME_HEIGHT))
-    fps = 30
-    width = 1920
+    #width = int(cap.get(cv.CAP_PROP_FRAME_WIDTH))
+    #height = int(cap.get(cv.CAP_PROP_FRAME_HEIGHT))
+    fps    = 30
+    width  = 1920
     height = 1080
 
     # Create output video writer
@@ -182,20 +182,21 @@ def draw_optical_flow_video(video_path, trajectories, output_path=None):
 
     frame_idx = 0
 
+    colors = [(np.random.choice(range(256), size=3)).tolist() for _ in range(len(trajectories))]
+
     # Process each frame
     for _ in tqdm(tqdm_generator(), desc='Creating flow visualization video'):
         ret, frame = cap.read()
         if not ret:
             break
 
-        #new_frame = cv.cvtColor(frame, cv.COLOR_BGR2RGB)
         new_frame = frame
 
         # Draw trajectory points for current frame
-        for traj in trajectories:
+        for i, traj in enumerate(trajectories):
             if frame_idx < len(traj):
                 x, y = int(traj[frame_idx][0]), int(traj[frame_idx][1])
-                cv.circle(new_frame, (x, y), 10, (0,255,0), -1)
+                cv.circle(new_frame, (x, y), 10, colors[i], -1)
 
         new_frame = cv.resize(new_frame, (width, height))
 
@@ -314,4 +315,3 @@ def visualize_rotation_analysis(trajectories, rotation_results, frames=None, gra
     plt.title("Angular Velocity")
     plt.legend()
     plt.show()
-

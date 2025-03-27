@@ -4,13 +4,18 @@ import pprint
 import sys
 import argparse
 
+from cv2.gapi import BGR2Gray
+
+from circle_fit import plot_data_circle, taubinSVD
 import cv2 as cv
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.signal import savgol_filter
 from tqdm import tqdm
 from scipy.optimize import minimize
+from scipy.signal import find_peaks
 
+from image_registration.video_matrix import rotate_frames_optical_flow
 from utils.filename_builder import append_file_extension, create_out_filename
 import utils.visualisers
 from utils.pprint import pprint_argparse, pprint_dict
@@ -33,147 +38,139 @@ def parse_args():
 
     return argparser.parse_args()
 
+def fit_circle_from_points(points:np.ndarray):
+    '''
+    Given a set of points in cartesian coordinates, try to fit a circle that describes them. 
+    Args:
+        points (np.ndarray): Points in 2D cartesian coordinates
+    Returns:
+        xc,yc: Center of the found circle
+        R: Radius
+        error: Residual error of the solution
+    '''
+    xc,yc, R, error = taubinSVD(points)
+    return xc,yc,R,error
 
-def estimate_rotation_center(trajectories, frames_to_use=None):
+def estimate_rotation_center_individually(trajectories:list[np.ndarray], return_mean=True):
+    '''
+    Estimates center for each of the trajectories, returns their mean or median.
+    Args:
+        trajectories (list[np.ndarray]): List of trajectories, each one containing an `np.ndarray` that describes the trajectory of the point.
+        return_mean: Whether to return mean or median of the circles
+    Returns:
+        center: Of all the trajectories
+        error: Mean / median of the residual errors
+    '''
+    centers = []
+    err     = []
+
+    for traj in tqdm(trajectories, desc='Finding center of rotation'):
+        # Need at least 3 points
+        if len(traj) < 3:
+            continue
+
+        xc,yc, _, error = fit_circle_from_points(traj)
+        centers.append((xc,yc))
+        err.append(error)
+
+    err_arr     = np.array(err)
+    centers_arr = np.array(centers)
+
+    if return_mean:
+        center = centers_arr.mean(axis=0)
+        error  = err_arr.mean()
+        return center, error
+
+    center = np.median(centers_arr, axis=0)
+    error  = np.median(err_arr)
+
+    return center, error
+
+def estimate_rotation_center(trajectories):
     """
-    Estimate the center of rotation for a set of trajectories using optimization.
+    Estimate the center of rotation for a set of trajectories.
     
     Args:
         trajectories (list): List of trajectory arrays with shape (n_frames, 2)
-        frames_to_use (int): Number of frames to use for estimation. If None, use all.
         
     Returns:
         tuple: (center_x, center_y) - the estimated center of rotation
-        float: quality metric (lower is better)
+        float: redidual error
     """
     # Combine all trajectory points for initial guess
-    all_points = np.vstack([traj[:frames_to_use] if frames_to_use else traj for traj in trajectories])
-    initial_center = np.mean(all_points, axis=0)
-    
-    # Define objective function to minimize
-    def objective(center):
-        center_x, center_y = center
-        variance_sum = 0
-        count = 0
-        
-        # For each trajectory, calculate variance of distances from center
-        for traj in trajectories:
-            points = traj[:frames_to_use] if frames_to_use else traj
-            if len(points) < 2:
-                continue
-                
-            # Calculate distances from center to each point
-            dx = points[:, 0] - center_x
-            dy = points[:, 1] - center_y
-            distances = np.sqrt(dx**2 + dy**2)
-            
-            # Variance of distances should be minimal for a true rotation center
-            variance_sum += np.var(distances)
-            count += 1
-            
-        return variance_sum / max(count, 1)
-    
-    # Optimize to find the center
-    result = minimize(objective, initial_center, method='Nelder-Mead')
-    center = result.x
-    quality = result.fun
-    
-    return center, quality
+    all_points = np.vstack([traj for traj in trajectories])
 
-def calculate_angular_movement(trajectories, center, smooth_window=None):
-    """
-    Calculate the angular movement of keypoints around a center for each frame.
-    
-    Args:
-        trajectories (list): List of trajectory arrays with shape (n_frames, 2)
-        center (tuple): (x, y) coordinates of the rotation center
-        smooth_window (int): Window size for smoothing angles, None for no smoothing
-        
-    Returns:
-        dict: Dictionary containing angular movements and related metrics
-    """
+    xc, yc, _, error = taubinSVD(all_points)
+
+    center = (xc,yc)
+
+    return center, error
+
+def calculate_angular_movement(trajectories, center):
+    '''
+    Calculates angular movement around a center of rotation.
+    '''
     center_x, center_y = center
-    
-    # Find the maximum frame count across all trajectories
+
     max_frames = max(len(traj) for traj in trajectories)
-    
-    # Initialize arrays for storing angular data
-    all_angles = []  # All individual angle changes
-    frame_angles = [[] for _ in range(max_frames-1)]  # Angle changes by frame
-    cumulative_angles = np.zeros(max_frames)  # Cumulative rotation
-    
-    # Process each trajectory
+
+    frame_angles = [[] for _ in range(max_frames - 1)]
+    all_angles   = [] #list of all trajectories and their respective angle changes
+
     for traj in trajectories:
         if len(traj) < 2:
             continue
-            
-        # Calculate the angle of each point relative to center
-        dx = traj[:, 0] - center_x
-        dy = traj[:, 1] - center_y
-        angles = np.arctan2(dy, dx)
-        
-        # Calculate angle changes between frames (unwrapped to handle -π to π transitions)
-        angle_changes = np.zeros(len(angles)-1)
-        for i in range(len(angles)-1):
-            change = angles[i+1] - angles[i]
-            # Handle wrapping around +/- π
-            if change > np.pi:
-                change -= 2 * np.pi
-            elif change < -np.pi:
-                change += 2 * np.pi
-            angle_changes[i] = change
-            
-            # Store by frame for averaging
-            if i < len(frame_angles):
-                frame_angles[i].append(change)
-                
+
+        dx     = traj[:, 0] - center_x
+        dy     = traj[:, 1] - center_y
+        angles = np.arctan2(dy,dx)
+
+        angle_changes = np.diff(np.unwrap(angles))
+
+        for i, change in enumerate(angle_changes):
+            frame_angles[i].append(change)
+
         all_angles.extend(angle_changes)
-    
-    # Calculate average angle change per frame
-    average_angle_per_frame = []
-    variance_angle_per_frame = []
-    for frame_idx, angles in enumerate(frame_angles):
+
+    avg_angle_per_frame = []
+    var_angle_per_frame = []
+    for angles in frame_angles:
         if angles:
             avg_angle = np.mean(angles)
             var_angle = np.var(angles)
-            average_angle_per_frame.append(avg_angle)
-            variance_angle_per_frame.append(var_angle)
-            
-            # Update cumulative angle
-            cumulative_angles[frame_idx+1:] += avg_angle
-    
-    # Apply smoothing if requested
-    if smooth_window and len(average_angle_per_frame) > smooth_window:
-        from scipy.signal import savgol_filter
-        # Make sure window length is odd
-        if smooth_window % 2 == 0:
-            smooth_window += 1
-        average_angle_per_frame = savgol_filter(
-            average_angle_per_frame, smooth_window, 2
-        ).tolist()
-    
-    # Convert to degrees
-    average_angle_per_frame_deg = [angle * 180 / np.pi for angle in average_angle_per_frame]
-    cumulative_angles_deg = cumulative_angles * 180 / np.pi
-    
-    # Prepare results
+        else:
+            avg_angle = 0.0
+            var_angle = 0.0
+
+        avg_angle_per_frame.append(avg_angle)
+        var_angle_per_frame.append(var_angle)
+
+    if avg_angle_per_frame:
+        # The first frame has angular movement of 0.0
+        avg_angle_per_frame.insert(0, 0.0)
+        var_angle_per_frame.insert(0, 0.0)
+
+    cum_angles = np.cumsum(avg_angle_per_frame)
+
+    avg_angle_per_frame_deg = [angle * 180 / np.pi for angle in avg_angle_per_frame]
+    cum_angles_deg          = cum_angles * 180 / np.pi
+
     results = {
-        "center": (center_x, center_y),
-        "average_angle_per_frame_rad": average_angle_per_frame,
-        "average_angle_per_frame_deg": average_angle_per_frame_deg,
-        "variance_angle_per_frame": variance_angle_per_frame,
-        "cumulative_angles_rad": cumulative_angles,
-        "cumulative_angles_deg": cumulative_angles_deg,
-        "mean_angular_velocity_deg_per_frame": np.mean(average_angle_per_frame_deg),
-        "median_angular_velocity_deg_per_frame": np.median(average_angle_per_frame_deg),
-        "total_rotation_deg": cumulative_angles_deg[-1],
-        "frame_count": max_frames
+        'center': (center_x, center_y),
+        'average_angle_per_frame_rad': avg_angle_per_frame,
+        'average_angle_per_frame_deg': avg_angle_per_frame_deg,
+        'variance_angle_per_frame': var_angle_per_frame,
+        'cumulative_angles_rad': cum_angles,
+        'cumulative_angles_deg': cum_angles_deg,
+        'mean_angular_velocity_deg_per_frame': np.mean(avg_angle_per_frame_deg),
+        'median_angular_velocity_deg_per_frame': np.median(avg_angle_per_frame_deg),
+        'total_rotation_deg': cum_angles_deg[-1],
+        'frame_count': max_frames
     }
-    
     return results
 
 
-def analyse_optical_flow(video_path, num_points=10, f_params=None, lk_params=None):
+def analyse_sparse_optical_flow(video_path, num_points=10, f_params=None, lk_params=None):
     '''
     Analyses optical flow in a video by tracking feature points. Can be used for registered and non-registered videos. In a registered video this will effectively measure how well is the video registered, in a non-registered video it will measure the optical flow of the video.
 
@@ -201,6 +198,7 @@ def analyse_optical_flow(video_path, num_points=10, f_params=None, lk_params=Non
 
     # Convert first frame to grayscale
     first_gray = cv.cvtColor(first_frame, cv.COLOR_BGR2GRAY)
+    #first_gray = cv.equalizeHist(first_gray)
 
     # Feature params
     if f_params is None:
@@ -215,51 +213,54 @@ def analyse_optical_flow(video_path, num_points=10, f_params=None, lk_params=Non
                          maxLevel=4,
                          criteria=(cv.TERM_CRITERIA_EPS | cv.TERM_CRITERIA_COUNT, 10, 0.001)) 
 
-    pprint_dict(f_params, 'feature params: ')
+    pprint_dict(f_params, 'Feature params: ')
     pprint_dict(lk_params, 'LK params:')
 
     # Detecting feature points in the first frame
     corners = cv.goodFeaturesToTrack(first_gray, mask=None, **f_params)
     
-    trajectories = []
-    for i in range(len(corners)):
-        trajectories.append([])
+    trajectories = [[] for _ in range(len(corners))]
+    for i, corner in enumerate(corners):
+        x,y = corner.ravel()
+        trajectories[i].append((x,y))
 
     frame_count = 0
     prev_gray   = first_gray
 
-    frame_counter = tqdm(desc='Calculating optical flow')
-    for _ in tqdm_generator():
-        ret,frame = cap.read()
-        if not ret:
-            break
+    with tqdm(desc='Opt flow', total=int(cap.get(cv.CAP_PROP_FRAME_COUNT))) as pbar:
+        i = 0
+        while True:
+            ret,frame = cap.read()
+            if not ret:
+                break
 
-        frame_count += 1
+            frame_count += 1
 
-        gray = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)    
+            gray = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)    
+            #gray = cv.equalizeHist(gray)
 
-        new_c, status, error = cv.calcOpticalFlowPyrLK(prev_gray, gray, corners, None, **lk_params)
-        logger.debug('Error: \n%s', error)
+            new_c, status, error = cv.calcOpticalFlowPyrLK(prev_gray, gray, corners, None, **lk_params)
 
-        mean_error = np.mean(error[status==1])
-        frame_counter.set_postfix(mean_error=f'{mean_error:.4f}')
+            mean_error = np.mean(error[status==1])
+            pbar.set_postfix(mean_error=f'{mean_error:.4f}')
 
-        # Select good points
-        good_new = new_c[status==1]
+            # Select good points
+            good_new = new_c[status==1]
 
-        # Store trajectories
-        for i, new in enumerate(good_new):
-            if i < len(trajectories):
-                x,y = new.ravel()
-                trajectories[i].append((x, y))
+            # Store trajectories
+            for i, new in enumerate(good_new):
+                if i < len(trajectories):
+                    x,y = new.ravel()
+                    trajectories[i].append((x, y))
 
-        prev_gray = gray.copy()
-        corners = good_new.reshape(-1, 1, 2)
+            prev_gray = gray.copy()
+            corners = good_new.reshape(-1, 1, 2)
 
-        frame_counter.update(1)
+            pbar.update(1)
+            i += 1
 
-    frame_counter.close()
-    cap.release()
+        pbar.close()
+        cap.release()
 
     # Convert to np array for analysis
     np_trajectories = []
@@ -269,6 +270,121 @@ def analyse_optical_flow(video_path, num_points=10, f_params=None, lk_params=Non
             np_trajectories.append(np.array(traj))
 
     return np_trajectories
+
+
+def analyse_dense_optical_flow(video_path, opt_flow_params=None):
+    if opt_flow_params is None:
+        farneback_p = dict(
+            pyr_scale=0.5,
+            levels=3,
+            winsize=15,
+            iterations=3,
+            poly_n=5,
+            poly_sigma=1.2,
+            flags=0
+        )
+
+    cap = cv.VideoCapture(video_path)
+    if not cap.isOpened():
+        print(f'Could not open video file {video_path}')
+        return None
+    
+    ret, prev_frame = cap.read()
+    if not ret:
+        return None
+
+    prev_gray = cv.cvtColor(prev_frame, cv.COLOR_BGR2GRAY)
+
+    flows = []
+    f_count = int(cap.get(cv.CAP_PROP_FRAME_COUNT))
+
+    with tqdm(total=f_count, desc='Dense optical flow') as pbar:
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
+
+            gray = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
+
+            flow = cv.calcOpticalFlowFarneback(prev_gray, gray, None, **farneback_p)
+            flows.append(flow)
+
+            prev_gray = gray.copy()
+            pbar.update(1)
+
+    cap.release()
+    return flows
+
+def visualise_dense_optical_flow(video_path, output_video_path=None):
+    cap = cv.VideoCapture(video_path)
+    if not cap.isOpened():
+        print(f"Error: Could not open video file {video_path}")
+        return
+    
+    # Get video properties for writing output video if needed
+    frame_width  = int(cap.get(cv.CAP_PROP_FRAME_WIDTH))
+    frame_height = int(cap.get(cv.CAP_PROP_FRAME_HEIGHT))
+    fps          = cap.get(cv.CAP_PROP_FPS)
+
+    writer = None
+    if output_video_path is not None:
+        fourcc = cv.VideoWriter_fourcc(*'mp4v')
+        writer = cv.VideoWriter(output_video_path, fourcc, fps, (frame_width, frame_height))
+    
+    # Read the first frame and convert to grayscale
+    ret, first_frame = cap.read()
+    if not ret:
+        print("Error: Could not read the first frame")
+        cap.release()
+        return
+    
+    prev_gray = cv.cvtColor(first_frame, cv.COLOR_BGR2GRAY)
+    
+    # Prepare an HSV image for visualization
+    hsv = np.zeros_like(first_frame)
+    hsv[..., 1] = 255  # Set saturation to maximum
+
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+        
+        gray = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
+        
+        # Compute dense optical flow using Farneback's method
+        flow = cv.calcOpticalFlowFarneback(prev_gray, gray, None, 
+                                           pyr_scale=0.5, levels=3, winsize=15, 
+                                           iterations=3, poly_n=5, poly_sigma=1.2, flags=0)
+        
+        # Compute magnitude and angle of 2D flow vectors
+        mag, ang = cv.cartToPolar(flow[..., 0], flow[..., 1])
+        
+        # Set hue according to the optical flow direction
+        hsv[..., 0] = ang * 180 / np.pi / 2
+        
+        # Set value according to the normalized magnitude (motion intensity)
+        hsv[..., 2] = cv.normalize(mag, None, 0, 255, cv.NORM_MINMAX)
+        
+        # Convert HSV image to BGR format for display
+        bgr_flow = cv.cvtColor(hsv, cv.COLOR_HSV2BGR)
+        
+        # Display the flow
+        cv.imshow('Dense Optical Flow', bgr_flow)
+        if writer is not None:
+            writer.write(bgr_flow)
+        
+        # Break loop on 'Esc' key press
+        if cv.waitKey(30) & 0xFF == 27:
+            break
+        
+        # Use the current frame as previous for the next iteration
+        prev_gray = gray.copy()
+    
+    cap.release()
+    if writer is not None:
+        writer.release()
+    cv.destroyAllWindows()
+
 
 def calculate_jitter_metrics(trajectories):
 
@@ -337,12 +453,60 @@ def calculate_jitter_metrics(trajectories):
 
     return metrics
 
+def visualize_dense_optical_flow_with_arrows(video_path):
+    cap = cv.VideoCapture(video_path)
+    if not cap.isOpened():
+        print(f"Error: Could not open video file {video_path}")
+        return
+    
+    ret, first_frame = cap.read()
+    if not ret:
+        print("Error: Could not read the first frame")
+        cap.release()
+        return
+    prev_gray = cv.cvtColor(first_frame, cv.COLOR_BGR2GRAY)
+    
+    hsv = np.zeros_like(first_frame)
+    hsv[..., 1] = 255  # full saturation
+    
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+        
+        gray = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
+        flow = cv.calcOpticalFlowFarneback(prev_gray, gray, None, 0.5, 3, 15, 3, 5, 1.2, 0)
+        mag, ang = cv.cartToPolar(flow[..., 0], flow[..., 1])
+        
+        hsv[..., 0] = ang * 180 / np.pi / 2  # map angle to hue
+        hsv[..., 2] = cv.normalize(mag, None, 0, 255, cv.NORM_MINMAX)
+        bgr_flow = cv.cvtColor(hsv, cv.COLOR_HSV2BGR)
+        
+        # Overlay arrows every few pixels for clarity
+        step = 16
+        for y in range(0, gray.shape[0], step):
+            for x in range(0, gray.shape[1], step):
+                fx, fy = flow[y, x].astype(np.int32)
+                cv.arrowedLine(bgr_flow, (x, y), (x+fx, y+fy), (255,255,255), 1, tipLength=0.3)
+        
+        cv.imshow('Dense Optical Flow with Arrows', bgr_flow)
+        if cv.waitKey(30) & 0xFF == 27:
+            break
+        
+        prev_gray = gray.copy()
+    
+    cap.release()
+    cv.destroyAllWindows()
+
+
 def main(args):
     logging.basicConfig(level=logging.INFO, format='%(levelname)s:%(name)s: %(message)s')
     logger = logging.getLogger(__name__)
     pprint_argparse(args, logger)
 
-    np_trajectories = analyse_optical_flow(args.input, num_points=args.num_kp)
+    temp = visualize_dense_optical_flow_with_arrows(args.input)
+    sys.exit()
+    np_trajectories = analyse_sparse_optical_flow(args.input, num_points=args.num_kp)
     jitter_metrics  = calculate_jitter_metrics(np_trajectories)
 
     _, name = os.path.split(args.input)
@@ -368,12 +532,18 @@ def main(args):
 
     if args.analyse:
         # Estimate center of rotation
-        center, quality = estimate_rotation_center(np_trajectories)
+        center, quality = estimate_rotation_center_individually(np_trajectories)
         logger.info(f"Estimated rotation center: ({center[0]:.2f}, {center[1]:.2f})")
         logger.info(f"Center quality metric: {quality:.6f} (lower is better)")
         
         # Calculate angular movement
-        rotation_results = calculate_angular_movement(np_trajectories, center, smooth_window=5)
+        rotation_results = calculate_angular_movement(np_trajectories, center)
+
+        peaks, _ = find_peaks(rotation_results['average_angle_per_frame_deg'])
+        print(f'Number of peaks found: {len(peaks)}')
+
+        if args.save:
+            rotate_frames_optical_flow(args.input, rotation_results['average_angle_per_frame_deg'], 1)
         
         # Print results
         logger.info(f"Mean angular velocity: {rotation_results['mean_angular_velocity_deg_per_frame']:.5f}° per frame")
@@ -387,7 +557,8 @@ def main(args):
         
         utils.visualisers.visualize_rotation_analysis(np_trajectories, rotation_results, graph_config=graph_config)
 
-    np.save('opt_flow_temp', np_trajectories)
+    if args.save:
+        np.save('opt_flow_temp', np_trajectories)
 
 if __name__ == "__main__":
     args = parse_args()

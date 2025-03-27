@@ -7,7 +7,7 @@ import cv2 as cv
 import matplotlib.pyplot as plt
 from skimage.measure import EllipseModel
 
-from image_registration.disp_utils import extract_medians
+from utils.disp_utils import extract_medians
 from utils import pprint
 from utils.loaders import load_npz_disp
 

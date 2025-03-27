@@ -49,6 +49,13 @@ def create_histogram(image, save_as):
     plt.savefig(save_as)
     plt.close()
 
+def create_min_mask(min_img):
+    mask = (min_img > 0).astype(dtype=np.uint8)
+    kernel_size = (5, 5)
+    kernel = cv.getStructuringElement(cv.MORPH_ELLIPSE, kernel_size)
+    morphed_mask = cv.morphologyEx(mask, cv.MORPH_CLOSE, kernel)
+    return morphed_mask
+
 def mask_img_with_min(to_mask, min_img):
     '''
     Masks image with a min image. This can be done because the min image creates a nice circular mask as the video is rotated.
@@ -59,10 +66,7 @@ def mask_img_with_min(to_mask, min_img):
         Masked image
     '''
 
-    mask = (min_img > 0).astype(dtype=np.uint8)
-    kernel_size = (20,20)
-    kernel = cv.getStructuringElement(cv.MORPH_ELLIPSE, kernel_size)
-    morphed_mask = cv.morphologyEx(mask, cv.MORPH_CLOSE, kernel)
+    morphed_mask = create_min_mask(min_img)
     return cv.bitwise_and(to_mask, to_mask, mask=morphed_mask)
 
 def gray_to_rgb(in_img):

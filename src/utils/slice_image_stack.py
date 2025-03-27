@@ -2,7 +2,6 @@ import sys
 import os
 import numpy as np
 import argparse
-#import matrix_processing
 
 import logging
 
@@ -22,7 +21,6 @@ def parse_args():
     optional.add_argument('-fs', '--frame_step', type=int, help='What frame step do you want to use?')
     return parser.parse_args()
 
-FRAME_STEP = 200
 def process_image_stack(img_stack:np.ndarray, frame_step:int):
     '''
     Generates image slices of `image_stack`, showing slices of size `frame_step`.
@@ -51,19 +49,19 @@ def process_image_stack(img_stack:np.ndarray, frame_step:int):
 def main(args):
 
     img_stack = np.load(args.input)
+    FRAME_STEP = 200
 
     logging.basicConfig(level=logging.INFO, format='%(levelname)s:%(name)s: %(message)s')
     logger = logging.getLogger(__name__)
     pprint.pprint_argparse(args, logger)
 
     if args.frame_step is not None:
-        global FRAME_STEP
         FRAME_STEP = args.frame_step
 
     gallery = process_image_stack(img_stack, FRAME_STEP)
 
-    path, name = os.path.split(args.input)
-    base, _    = os.path.splitext(name)
+    _, name = os.path.split(args.input)
+    base, _ = os.path.splitext(name)
     new_filename = filename_builder.create_out_filename(f'./images/{base}', prefixes=[], suffixes=['slices'])
     print(new_filename)
     visualisers.imshow(new_filename, **gallery)

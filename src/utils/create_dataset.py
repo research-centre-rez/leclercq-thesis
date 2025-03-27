@@ -4,6 +4,7 @@ import csv
 import sys
 from image_processing.extract_frames_from_video import extract_frames_from_video
 
+# TODO: Figure out what to do with this. Either delete or fix
 def load_csv(csv_path, new_dataset_path:str, howMany:int):
     def map_index(sample:str, index:str):
         return sample + index

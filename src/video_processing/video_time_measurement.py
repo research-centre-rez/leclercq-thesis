@@ -189,6 +189,7 @@ def process_videos_in_directories(root_dir):
     csv_data = list(zip(vidids, start_frames, min_ids, min_mismatch))
     write_to_csv(csv_data, './final_data.csv')
 
+# TODO: Add argparse
 if __name__ == "__main__":
     res = measure_full_rotation_time('./calibration_video/calibration_video-part1.mp4', True)
     print(res)
