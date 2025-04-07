@@ -5,7 +5,7 @@ import numpy as np
 import cv2 as cv
 from tqdm import tqdm
 
-'''
+"""
 Video preprocessing
 
 OpenCV has a default setting that specifies how many frames it will read from a video, you should change this before running any of these functions with:
@@ -13,7 +13,7 @@ OpenCV has a default setting that specifies how many frames it will read from a 
 export OPENCV_FFMPEG_READ_ATTEMPTS=100000
 
 While the os.environ written above should do it for you, it is possible that it might not work.
-'''
+"""
 
 def seconds_to_hms(seconds):
     hours = int(seconds // 3600)
@@ -134,6 +134,7 @@ def process_videos(directory_path):
             log_file.write(file + '\n')
 
 # TODO: Add argparse functionalities
+# TODO: Currently, this approach is not required to be used
 if __name__ == "__main__":
     vid_path = '../../data/calibration_video.MP4'
     out = './calibration_video/'

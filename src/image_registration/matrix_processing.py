@@ -128,7 +128,7 @@ def main(args):
             continue
         reps[key] = gray_to_rgb(value)
 
-    save_as = filename_builder.create_out_filename(f'./images/{base_name}', [], ['gallery'])
+    save_as = filename_builder.create_out_filename(f'./_images/{base_name}', [], ['gallery'])
 
     visualisers.imshow(title=save_as, **reps)
 

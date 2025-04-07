@@ -1,4 +1,5 @@
 import os
+import argparse
 import csv
 import cv2 as cv
 import numpy as np
@@ -8,6 +9,17 @@ import matplotlib.pyplot as plt
 VIDEO_PATH1 = '../data/10/10-vrsek-part0.mp4'
 VIDEO_PATH2 = '../data/10/10-vrsek-part1.mp4'
 VIDEO_PATH3 = '../data/1A/1A-exp-part1.mp4'
+
+def parse_args():
+    parser = argparse.ArgumentParser(description='Measures time for full rotation of samples')
+
+    optional = parser._action_groups.pop()
+    required = parser.add_argument_group('required arguments')
+    required.add_argument('-i', '--input', required=True, help='Path to the video whose rotation time you want to measure')
+
+    optional = parser.add_argument_group('optional arguments')
+    optional.add_argument('--plot_graphs', default=False, action=argparse.BooleanOptionalAction, help='Do you want to plot the graphs of rotation times or not')
+    return parser.parse_args()
 
 def plot_accum_graph(data):
     '''
@@ -189,8 +201,11 @@ def process_videos_in_directories(root_dir):
     csv_data = list(zip(vidids, start_frames, min_ids, min_mismatch))
     write_to_csv(csv_data, './final_data.csv')
 
-# TODO: Add argparse
-if __name__ == "__main__":
-    res = measure_full_rotation_time('./calibration_video/calibration_video-part1.mp4', True)
+def main(args):
+    res = measure_full_rotation_time(args.input, args.show_graphs)
     print(res)
+
+if __name__ == "__main__":
+    args = parse_args()
+    main(args)
 

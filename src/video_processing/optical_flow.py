@@ -504,8 +504,6 @@ def main(args):
     logger = logging.getLogger(__name__)
     pprint_argparse(args, logger)
 
-    temp = visualize_dense_optical_flow_with_arrows(args.input)
-    sys.exit()
     np_trajectories = analyse_sparse_optical_flow(args.input, num_points=args.num_kp)
     jitter_metrics  = calculate_jitter_metrics(np_trajectories)
 
