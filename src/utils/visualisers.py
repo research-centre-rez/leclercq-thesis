@@ -295,23 +295,23 @@ def visualize_rotation_analysis(trajectories, rotation_results, frames=None, gra
         plt.show()
 
     # Get angle data
-    angles_deg = rotation_results["average_angle_per_frame_deg"]
-    angles_var = rotation_results["variance_angle_per_frame"]
-    frames_idx = range(len(angles_deg))
-
-    std_dev = np.sqrt(angles_var)
-
-    plt.plot(frames_idx, angles_deg, 'b-', label='Mean angle per frame')
-    plt.fill_between(frames_idx, angles_deg - std_dev, angles_deg + std_dev, color='blue', alpha=0.2, label='±1 std dev')
-    plt.axhline(y=rotation_results["mean_angular_velocity_deg_per_frame"],
-                color='r', linestyle='--',
-                label=f'Mean: {rotation_results["mean_angular_velocity_deg_per_frame"]:.5f}° / frame')
-
-    plt.axhline(y=rotation_results["median_angular_velocity_deg_per_frame"],
-                color='g', linestyle='--',
-                label=f'Median: {rotation_results["median_angular_velocity_deg_per_frame"]:.5f}° / frame')
-    plt.xlabel('Frame')
-    plt.ylabel('Angular Movement (degrees)')
-    plt.title("Angular Velocity")
-    plt.legend()
+#    angles_deg = rotation_results["average_angle_per_frame_deg"]
+#    angles_var = rotation_results["variance_angle_per_frame"]
+#    frames_idx = range(len(angles_deg))
+#
+#    std_dev = np.sqrt(angles_var)
+#
+#    plt.plot(frames_idx, angles_deg, 'b-', label='Mean angle per frame')
+#    plt.fill_between(frames_idx, angles_deg - std_dev, angles_deg + std_dev, color='blue', alpha=0.2, label='±1 std dev')
+#    plt.axhline(y=rotation_results["mean_angular_velocity_deg_per_frame"],
+#                color='r', linestyle='--',
+#                label=f'Mean: {rotation_results["mean_angular_velocity_deg_per_frame"]:.5f}° / frame')
+#
+#    plt.axhline(y=rotation_results["median_angular_velocity_deg_per_frame"],
+#                color='g', linestyle='--',
+#                label=f'Median: {rotation_results["median_angular_velocity_deg_per_frame"]:.5f}° / frame')
+#    plt.xlabel('Frame')
+#    plt.ylabel('Angular Movement (degrees)')
+#    plt.title("Angular Velocity")
+#    plt.legend()
     plt.show()

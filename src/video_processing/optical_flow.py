@@ -4,8 +4,6 @@ import pprint
 import sys
 import argparse
 
-from cv2.gapi import BGR2Gray
-
 from circle_fit import plot_data_circle, taubinSVD
 import cv2 as cv
 import numpy as np
@@ -368,14 +366,8 @@ def visualise_dense_optical_flow(video_path, output_video_path=None):
         # Convert HSV image to BGR format for display
         bgr_flow = cv.cvtColor(hsv, cv.COLOR_HSV2BGR)
         
-        # Display the flow
-        cv.imshow('Dense Optical Flow', bgr_flow)
         if writer is not None:
             writer.write(bgr_flow)
-        
-        # Break loop on 'Esc' key press
-        if cv.waitKey(30) & 0xFF == 27:
-            break
         
         # Use the current frame as previous for the next iteration
         prev_gray = gray.copy()

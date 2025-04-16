@@ -35,7 +35,6 @@ def parse_args():
 
 
 def rotate_frames_optical_flow(video_path, angles):
-
     logger = logging.getLogger(__name__)
 
     cap = cv.VideoCapture(video_path)
