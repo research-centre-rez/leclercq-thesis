@@ -1,0 +1,19 @@
+{
+  "fps_out":25,
+  "sampling_rate": 4,
+  "downscale_factor": 2,
+  "grayscale": true,
+  "start_at": 15,
+  "num_points": 25,
+  "f_params": {
+    "maxCorners": 30,
+    "qualityLevel": 0.002,
+    "minDistance": 5,
+    "blockSize": 7
+  },
+  "lk_params": {
+    "winSize": [30, 30],
+    "maxLevel": 3,
+    "criteria": [3, 15, 0.01]
+  }
+}
