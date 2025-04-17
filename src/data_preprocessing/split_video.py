@@ -2,13 +2,14 @@ import os
 import subprocess
 import logging
 
-import cv2 as cv
-
 from utils.filename_builder import append_file_extension, create_out_filename
 
-def seconds_to_hms(seconds) -> str:
+logger = logging.getLogger(__name__)
+
+
+def _get_ffmpeg_timestamp(seconds) -> str:
     '''
-    Conversion from seconds to hours/minutes/secods
+    Conversion from seconds to hours:minutes:secods
     '''
     hours = int(seconds // 3600)
     minutes = int((seconds % 3600) // 60)
@@ -16,8 +17,9 @@ def seconds_to_hms(seconds) -> str:
 
     return f'{hours:02}:{minutes:02}:{secs:05.3f}'
 
+
 def split_video(video_path:str, frame_idx:list[int], output_dir:str, fps:float) -> None:
-    """"
+    """
     Given the path of a video, split it into separate videos such that each sub-video contains only one angle of lighting.
     ffmpeg is used in order to preserve the quality of the video(s).
 
@@ -30,7 +32,6 @@ def split_video(video_path:str, frame_idx:list[int], output_dir:str, fps:float) 
         None
     """
 
-    logger = logging.getLogger(__name__)
     base_name, _ = os.path.splitext(os.path.basename(video_path))
 
     output_dir = os.path.join(output_dir, (base_name.split('-')[0]))
@@ -51,8 +52,8 @@ def split_video(video_path:str, frame_idx:list[int], output_dir:str, fps:float) 
         end_t = round((end / fps), 2)
 
         # ffmpeg uses hms time format so we convert
-        start_t = seconds_to_hms(start_t)
-        end_t = seconds_to_hms(end_t)
+        start_t = _get_ffmpeg_timestamp(start_t)
+        end_t = _get_ffmpeg_timestamp(end_t)
 
         out_name = create_out_filename(base_name, [], [f'part{video_index}'])
         out_name = append_file_extension(out_name, 'mp4')
@@ -61,3 +62,5 @@ def split_video(video_path:str, frame_idx:list[int], output_dir:str, fps:float) 
             'ffmpeg', '-i', video_path, '-ss', str(start_t), '-to', str(end_t), '-c', 'copy', '-n', output_file
         ])
         video_index += 1
+
+    logger.info('Created %s videos stored in %s', video_index, output_dir)
