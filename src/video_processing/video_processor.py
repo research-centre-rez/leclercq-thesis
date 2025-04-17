@@ -1,10 +1,11 @@
 import os
 import logging
+import csv
 import cv2 as cv
 import numpy as np
 from tqdm import tqdm
 
-from utils.filename_builder import create_out_filename
+from utils.filename_builder import append_file_extension, create_out_filename
 from utils.prep_cap import prep_cap
 import utils.visualisers
 from video_processing.optical_flow import analyse_sparse_optical_flow, calculate_angular_movement, estimate_rotation_center, estimate_rotation_center_individually
@@ -135,6 +136,7 @@ class VideoProcessor:
 
         logger.info('Correct number of angles: %s', len(angles) == self.total)
 
+        transformations = []
         with tqdm(desc=f'Un-rotating with {name}', total=self.total) as pbar:
             i = 0
             while True:
@@ -157,7 +159,7 @@ class VideoProcessor:
 
 
                 self.writer.write(scaled_frame)
-
+                transformations.append(M)
                 pbar.set_postfix(angle=f'{angle:.4f}')
                 pbar.update(1)
                 i +=1
@@ -165,3 +167,20 @@ class VideoProcessor:
         self.writer.release()
         self.cap_in.release()
         logger.info('Video saved in %s', self.vid_out)
+        self._write_trans_into_csv(transformations) # Write transformations to a csv file
+
+
+    def _write_trans_into_csv(self, transformations:list[np.ndarray]):
+        base, _ = os.path.splitext(self.vid_out)
+
+        save_as = create_out_filename(base, [], ['transformations'])
+        save_as = append_file_extension(save_as, '.csv')
+
+        with open(save_as, 'w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(['frame_id','m00','m01','m02','m10','m11','m12'])
+
+            for i, M in enumerate(transformations):
+                writer.writerow([i] + M.ravel().tolist())
+
+        logger.info('Stored csv data about transformations in %s', save_as)
