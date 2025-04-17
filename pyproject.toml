@@ -1,0 +1,25 @@
+[project]
+name = "registering concrete blocks"
+version = "0.1.0"
+description = "Package used for creating super-resolution images of concrete samples"
+authors = [
+    {name = "Erik Leclercq",email = "rkleclercq@gmail.com"}
+]
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "logging (>=0.4.9.6,<0.5.0.0)",
+    "opencv-python (>=4.11.0.86,<5.0.0.0)",
+    "tqdm (>=4.67.1,<5.0.0)",
+    "numpy (>=2.2.4,<3.0.0)"
+]
+
+[tool.poetry]
+
+[tool.poetry.group.dev.dependencies]
+circle-fit = "^0.2.1"
+argparse = "^1.4.0"
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
