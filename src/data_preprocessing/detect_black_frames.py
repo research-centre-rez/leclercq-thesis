@@ -66,18 +66,6 @@ def detect_black_frames(vid_path:str, threshold=5):
     black_frame_indices = []
     frame_count         = int(cap.get((cv.CAP_PROP_FRAME_COUNT)))
 
-    height = int(cap.get(cv.CAP_PROP_FRAME_HEIGHT))
-    width  = int(cap.get(cv.CAP_PROP_FRAME_WIDTH))
-
-    center_x = width // 2
-    center_y = height // 2
-    half_size = 500
-
-    start_x = center_x - half_size
-    start_y = center_y - half_size
-    end_x   = center_x + half_size
-    end_y   = center_y + half_size
-
     with tqdm(range(frame_count), leave=False) as progress:
         for i in progress:
             ret, frame = cap.read()
