@@ -58,7 +58,7 @@ def detect_black_frames(vid_path:str, threshold=5):
 
     prev_black = True
 
-    cap = cv.VideoCapture(vid_path, cv.CAP_FFMPEG)
+    cap = cv.VideoCapture(vid_path)
     fps = cap.get(cv.CAP_PROP_FPS)
     if cap.isOpened():
         logger.info('Succesfully loaded video: %s', vid_path)
