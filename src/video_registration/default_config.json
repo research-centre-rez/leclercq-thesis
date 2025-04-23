@@ -1,0 +1,10 @@
+{
+  "mudic":{
+    "box_h":100,
+    "box_w":100,
+    "num_elems_x":5,
+    "num_elems_y":5,
+    "max_it":75,
+    "ref_range":15
+  }
+}
