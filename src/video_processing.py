@@ -33,6 +33,7 @@ def parse_args():
 
     optional = argparser._action_groups.pop()
     req = argparser.add_argument_group("required arguments")
+    optional = argparser.add_argument_group("optional arguments")
 
     # Required arguments
     req.add_argument(
