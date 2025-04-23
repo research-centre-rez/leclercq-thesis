@@ -153,6 +153,10 @@ class VideoProcessor:
                     pbar.update(1)
                     continue
 
+                if self.grayscale:
+                    frame = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
+                    frame = cv.cvtColor(frame, cv.COLOR_GRAY2BGR)
+
                 M             = cv.getRotationMatrix2D(center=center, angle=angle, scale=1)
                 rotated_frame = cv.warpAffine(frame, M, (self.cap_w, self.cap_h))
                 scaled_frame  = cv.resize(rotated_frame, (self.new_w, self.new_h))
