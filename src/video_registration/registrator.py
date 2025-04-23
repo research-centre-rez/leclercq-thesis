@@ -1,3 +1,4 @@
+import logging
 import os 
 import sys
 import csv
@@ -5,14 +6,15 @@ import numpy as np
 import cv2 as cv
 import muDIC as dic
 
+from skimage.measure import EllipseModel
 from tqdm import tqdm
+from utils.disp_utils import extract_medians
 from utils.filename_builder import append_file_extension, create_out_filename
 from utils.prep_cap import prep_cap
-import utils.visualisers
 
-import logging
+from utils.pprint import pprint_dict
 
-from video_registration.mudic_utils import correlate_matrix, create_mesh
+from video_registration.mudic_utils import correlate_matrix, create_mesh, get_mesh_nodes
 from video_registration.video_matrix import create_video_matrix
 
 logger = logging.getLogger(__name__)
@@ -60,9 +62,12 @@ class VideoRegistrator:
 
 
     def _mudic(self):
-        vid_list = list(create_video_matrix(self.vid_in))
-        image_stack = dic.image_stack_from_list(list(vid_list))
         mudic_config = self.config.get("mudic")
+        pprint_dict(mudic_config, 'mudic in reg', logger)
+
+        vid_stack   = create_video_matrix(self.vid_in, True)
+        image_stack = dic.image_stack_from_list(list(vid_stack))
+
         mesh = create_mesh(self.frame_h,
                            self.frame_w,
                            image_stack,
@@ -70,18 +75,67 @@ class VideoRegistrator:
                            mudic_config.get("box_w"),
                            mudic_config.get("num_elems_x"),
                            mudic_config.get("num_elems_y"))
-        mesh_nodes = get_mesh_nodes(mesh)
+
         displacement = correlate_matrix(image_stack,
                                         mesh,
-                                        self.config.get("ref_range"),
-                                        self.config.get("max_it"))
+                                        mudic_config.get("ref_range"),
+                                        mudic_config.get("max_it"))
+        displacement = displacement.squeeze()
+        meds = extract_medians(displacement)
 
         logger.info('mudic finished succesfully')
+        vid_stack = self._shift_by_vector(vid_stack, meds)
+
+        np.save(self.vid_out, vid_stack)
+        logger.info('Registered video saved to %s', self.vid_out)
 
 
+    def _shift_by_vector(self, image_stack, displacement):
+        n, h, w = image_stack.shape
+
+        x_c, y_c = self._fit_ellipse(displacement)
+
+        for i in tqdm(range(n), desc='Registering by shift'):
+            image = image_stack[i]
+            x_d, y_d = displacement[i]
+
+            T = np.array([[1, 0, -x_d + x_c],
+                          [0, 1, -y_d + y_c]])
+
+            im_translated = cv.warpAffine(image, T, (w,h))
+            image_stack[i] = im_translated
+
+        return image_stack
+
+    def _fit_ellipse(self, disp:np.ndarray):
+        model = EllipseModel()
+        success = model.estimate(disp)
+
+        if not success:
+            logger.error('failed to find an ellipse')
+            sys.exit(-1) # TODO: Figure out what to do with this
+
+        xc, yc, _, _, _ = model.params
+
+        return xc,yc
 
     def _lightglue(self):
         print("TODO")
 
     def _save_img_stack(self):
         print("TODO")
+
+    def _write_transformation_into_csv(self, trans:list[np.ndarray]):
+        base, _ = os.path.splitext(self.vid_out)
+
+        save_as = create_out_filename(base, [], ['transformations'])
+        save_as = append_file_extension(save_as, '.csv')
+
+        with open(save_as, 'w', newline='') as f:
+            writer = csv.writer(f)
+
+            for i, M in enumerate(trans):
+                writer.writerow([i] + M.ravel().tolist())
+
+        logger.info('Stored csv data about transformation in %s', save_as)
+

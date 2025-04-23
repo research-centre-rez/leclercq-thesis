@@ -57,8 +57,6 @@ def correlate_matrix(image_stack:dic.ImageStack, mesh:dic.mesh.meshUtilities.Mes
         Displacement matrix of shape [1, 2, i, j, n] where (i,j) are number of cells in the `x` and `y` axis and `n` is the number of frames.
     '''
 
-    logger = logging.getLogger(__name__)
-
     logger.debug('Image stack created successfully')
 
     ref_frames = list(np.arange(ref_range, len(image_stack), ref_range))
@@ -94,8 +92,7 @@ def correlate_matrix(image_stack:dic.ImageStack, mesh:dic.mesh.meshUtilities.Mes
     # If the correlation fails, muDIC still returns incomplete displacement and doesn't
     # say whether there was an error or not
     if disp.shape[-1] != len(image_stack):
-        logger.error('muDIC correlation failed to run on the whole image_stack, exiting')
-        sys.exit(-1)
+        logger.error('muDIC correlation failed to run on the whole image_stack')
 
     return disp
 
