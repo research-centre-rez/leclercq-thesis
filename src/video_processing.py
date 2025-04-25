@@ -73,7 +73,7 @@ def main(args):
         level=logging.INFO, format="%(levelname)s:%(name)s: %(message)s"
     )
     logger = logging.getLogger(__name__)
-    pprint.pprint_argparse(args)
+    pprint.log_argparse(args)
 
     config = load_config(args.config)
     pprint.pprint_dict(config, desc='Config parameters')
