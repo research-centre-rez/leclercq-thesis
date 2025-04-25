@@ -18,7 +18,7 @@ def _get_ffmpeg_timestamp(seconds) -> str:
     return f'{hours:02}:{minutes:02}:{secs:05.3f}'
 
 
-def split_video(video_path:str, frame_idx:list[int], output_dir:str, fps:float) -> None:
+def split_video(video_path:str, frame_idx:list[int], output_dir:str, fps:float) -> dict:
     """
     Given the path of a video, split it into separate videos such that each sub-video contains only one angle of lighting.
     ffmpeg is used in order to preserve the quality of the video(s).
@@ -29,7 +29,7 @@ def split_video(video_path:str, frame_idx:list[int], output_dir:str, fps:float) 
         output_dir (str): Target location for the new videos, they will be stored in their own directory to prevent cluttering
         fps (float): Used for calculating start and end times for ffmpeg
     Returns: 
-        None
+        dict of statistics about creates videos.
     """
 
     base_name, _ = os.path.splitext(os.path.basename(video_path))
@@ -41,6 +41,8 @@ def split_video(video_path:str, frame_idx:list[int], output_dir:str, fps:float) 
 
     os.makedirs(output_dir, exist_ok=True)
 
+    stats = {}
+
     video_index = 0 #index of video part
     for i in range(0, len(frame_idx), 2):
         logger.info('indices of frames: %s', (frame_idx[i], frame_idx[i+1]))
@@ -48,19 +50,22 @@ def split_video(video_path:str, frame_idx:list[int], output_dir:str, fps:float) 
         start, end = frame_idx[i], frame_idx[i+1]
 
         # calculate the start and end times
-        start_t = round((start / fps), 2)
-        end_t = round((end / fps), 2)
+        start_t  = round((start / fps), 2)
+        end_t    = round((end / fps), 2)
+        duration = end_t - start_t
 
         # ffmpeg uses hms time format so we convert
         start_t = _get_ffmpeg_timestamp(start_t)
-        end_t = _get_ffmpeg_timestamp(end_t)
+        end_t   = _get_ffmpeg_timestamp(end_t)
 
-        out_name = create_out_filename(base_name, [], [f'part{video_index}'])
-        out_name = append_file_extension(out_name, 'mp4')
+        out_name    = create_out_filename(base_name, [], [f'part{video_index}'])
+        out_name    = append_file_extension(out_name, 'mp4')
         output_file = os.path.join(output_dir, out_name)
+
+        stats[output_file] = duration
         subprocess.call([
             'ffmpeg', '-i', video_path, '-ss', str(start_t), '-to', str(end_t), '-c', 'copy', '-n', output_file
         ])
         video_index += 1
 
-    logger.info('Created %s videos stored in %s', video_index, output_dir)
+    return stats
