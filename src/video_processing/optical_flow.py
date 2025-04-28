@@ -23,7 +23,7 @@ def fit_circle_from_points(points: np.ndarray):
     return xc, yc, R, error
 
 
-def estimate_rotation_center_individually(
+def estimate_rotation_center_for_each_trajectory(
     trajectories: list[np.ndarray], return_mean=True
 ):
     """
@@ -84,7 +84,7 @@ def estimate_rotation_center(trajectories):
 
 def calculate_angular_movement(trajectories, center):
     """
-    Calculates angular movement for optical flow around a center of rotation.
+    Calculates angular movement for optical flow around a center of rotation. The coordinates are in the coordinate system of the video.
     """
     center_x, center_y = center
 
@@ -97,8 +97,9 @@ def calculate_angular_movement(trajectories, center):
         if len(traj) < 2:
             continue
 
-        dx     = traj[:, 0] - center_x
-        dy     = traj[:, 1] - center_y
+        dx = traj[:, 0] - center_x
+        dy = traj[:, 1] - center_y
+
         angles = np.arctan2(dy, dx)
 
         angle_changes = np.diff(np.unwrap(angles))
@@ -116,13 +117,13 @@ def calculate_angular_movement(trajectories, center):
             avg_angle = np.mean(angles)
             var_angle = np.var(angles)
         else:
-            avg_angle = 0.0
-            var_angle = 0.0
+            avg_angle = np.nan
+            var_angle = np.nan
 
         avg_angle_per_frame.append(avg_angle)
         var_angle_per_frame.append(var_angle)
 
-    cum_angles = np.cumsum(avg_angle_per_frame)
+    cum_angles = np.nancumsum(avg_angle_per_frame)
 
     avg_angle_per_frame_deg = [angle * 180 / np.pi for angle in avg_angle_per_frame]
     cum_angles_deg          = cum_angles * 180 / np.pi
@@ -142,7 +143,7 @@ def calculate_angular_movement(trajectories, center):
 
 
 def analyse_sparse_optical_flow(
-    vid_path, start_at, num_points, f_params=None, lk_params=None
+    vid_path, start_at, f_params=None, lk_params=None
 ) -> list[np.ndarray]:
     """
     Analyses optical flow in a video by tracking feature points. Can be used for registered and non-registered videos. In a registered video this will effectively measure how well is the video registered, in a non-registered video it will measure the optical flow of the video.
@@ -170,20 +171,13 @@ def analyse_sparse_optical_flow(
 
     # Feature params
     if f_params is None:
-        f_params = {
-            "maxCorners": num_points,
-            "qualityLevel": 0.001,
-            "minDistance": 7,
-            "blockSize": 7,
-        }
+        logger.error("No configuration was passed for detecting features.")
+        sys.exit(-1)
 
     # Lukas-kane sparse optical flow params
     if lk_params is None:
-        lk_params = {
-            "winSize": (40, 40),
-            "maxLevel": 4,
-            "criteria": (cv.TERM_CRITERIA_EPS | cv.TERM_CRITERIA_COUNT, 10, 0.001),
-        }
+        logger.error("No configuration was passed for Lukas-Kanade optical flow")
+        sys.exit(-1)
 
     # Detecting feature points in the first frame
     corners = cv.goodFeaturesToTrack(first_gray, mask=None, **f_params)
@@ -209,7 +203,7 @@ def analyse_sparse_optical_flow(
 
             gray = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
 
-            new_c, status, error = cv.calcOpticalFlowPyrLK(
+            new_corners, status, error = cv.calcOpticalFlowPyrLK(
                 prev_gray, gray, corners, None, **lk_params
             )
 
@@ -217,16 +211,16 @@ def analyse_sparse_optical_flow(
             pbar.set_postfix(mean_error=f"{mean_error:.4f}")
 
             # Select good points
-            good_new = new_c[status == 1]
+            good_new_corners = new_corners[status == 1]
 
             # Store trajectories
-            for i, new in enumerate(good_new):
+            for i, new in enumerate(good_new_corners):
                 if i < len(trajectories):
                     x, y = new.ravel()
                     trajectories[i].append((x, y))
 
             prev_gray = gray.copy()
-            corners = good_new.reshape(-1, 1, 2)
+            corners = good_new_corners.reshape(-1, 1, 2)
 
             pbar.update(1)
             i += 1

@@ -6,9 +6,10 @@ import numpy as np
 from tqdm import tqdm
 
 from utils.filename_builder import append_file_extension, create_out_filename
+from utils.pprint import pprint_dict
 from utils.prep_cap import prep_cap
 import utils.visualisers
-from video_processing.optical_flow import analyse_sparse_optical_flow, calculate_angular_movement, estimate_rotation_center, estimate_rotation_center_individually
+from video_processing.optical_flow import analyse_sparse_optical_flow, calculate_angular_movement, estimate_rotation_center, estimate_rotation_center_for_each_trajectory
 
 logger  = logging.getLogger(__name__)
 
@@ -73,19 +74,18 @@ class VideoProcessor:
         '''
         Performs optical flow on the the video.
         '''
-        f_params   = self.config.get("f_params")
-        lk_params  = self.config.get("lk_params")
-        num_points = self.config.get("num_points")
+        opt_flow_params = self.config.get("opt_flow_params")
+        f_params   = opt_flow_params["f_params"]
+        lk_params  = opt_flow_params['lk_params']
 
         np_trajectories = analyse_sparse_optical_flow(self.vid_in,
-                                                      num_points=num_points,
                                                       lk_params=lk_params,
                                                       f_params=f_params,
                                                       start_at=self.start_at)
 
-        center, quality = estimate_rotation_center_individually(np_trajectories)
-        logger.info(f"Estimated rotation center: ({center[0]:.2f}, {center[1]:.2f})")
-        logger.info(f"Center quality metric: {quality:.6f} (lower is better)")
+        center, quality = estimate_rotation_center_for_each_trajectory(np_trajectories)
+        logger.info("Estimated rotation center: (%s, %s)", center[0], center[1])
+        logger.info("Center quality metric: %s (lower is better)", quality)
 
         rotation_res = calculate_angular_movement(np_trajectories, center)
 
@@ -103,16 +103,21 @@ class VideoProcessor:
 
 
     def _guesstimate(self):
-        center_offset   = np.array((-59.06519626, -14.92924515))
+        estimate_params = self.config.get("estimate_params")
+        center_offset   = np.array(estimate_params["center_offset"])
+        print(center_offset)
+        center_offset   = center_offset / self.downscale_f
+        print(center_offset)
+        rot_per_frame   = estimate_params["rotation_per_frame"]
+
         center_x        = self.cap_w // 2
         center_y        = self.cap_h // 2
         rotation_center = center_offset + (center_x, center_y)
-        rot_per_frame   = np.float64(0.14798)
         logger.info('Rotation center: %s', rotation_center)
         logger.info('Rotation per frame: %s', rot_per_frame)
 
         angles = [0]
-        angles.extend([rot_per_frame for i in range(self.total - 1)])
+        angles.extend([rot_per_frame for _ in range(self.total - 1)])
 
         self._rotate_around_center(rotation_center, angles, 'approximation')
 
