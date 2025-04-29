@@ -105,9 +105,7 @@ class VideoProcessor:
     def _guesstimate(self):
         estimate_params = self.config.get("estimate_params")
         center_offset   = np.array(estimate_params["center_offset"])
-        print(center_offset)
         center_offset   = center_offset / self.downscale_f
-        print(center_offset)
         rot_per_frame   = estimate_params["rotation_per_frame"]
 
         center_x        = self.cap_w // 2
