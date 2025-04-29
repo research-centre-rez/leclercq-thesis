@@ -5,6 +5,8 @@ import csv
 import numpy as np
 import cv2 as cv
 import muDIC as dic
+from lightglue import LightGlue, SuperPoint, DISK, SIFT, ALIKED, DoGHardNet
+from lightglue.utils import load_image, rbd, numpy_image_to_torch
 
 from skimage.measure import EllipseModel
 from tqdm import tqdm
@@ -65,7 +67,7 @@ class VideoRegistrator:
         mudic_config = self.config.get("mudic")
         pprint_dict(mudic_config, 'mudic in reg', logger)
 
-        vid_stack   = create_video_matrix(self.vid_in, True)
+        vid_stack   = create_video_matrix(self.vid_in, grayscale=True)
         image_stack = dic.image_stack_from_list(list(vid_stack))
 
         mesh = create_mesh(self.frame_h,
@@ -120,7 +122,62 @@ class VideoRegistrator:
         return xc,yc
 
     def _lightglue(self):
-        print("TODO")
+        _lglue_config = self.config.get('lightGlue')
+        _hom_config   = _lglue_config['homography']
+        _matcher       = _lglue_config['matcher']
+        extractor     = _lglue_config['extractor']
+        max_num_kp    = _lglue_config['max_num_keypoints']
+
+        # Parsing the human-readable string into an opencv enum
+        _hom_config['method'] = getattr(cv, _hom_config['method'])
+
+        transformations = [np.eye(3,3)]
+
+        vid_stack   = create_video_matrix(self.vid_in, grayscale=True)
+
+        logger.info('Initialising the extractor and matcher')
+        if extractor == "SuperPoint":
+            extractor = SuperPoint(max_num_keypoints=max_num_kp).eval().cuda()
+            matcher   = LightGlue(features='superpoint', **_matcher).eval().cuda()
+        elif extractor == "DISK":
+            extractor = DISK(max_num_keypoints=max_num_kp).eval().cuda()
+            matcher   = LightGlue(features='disk', **_matcher).eval().cuda()
+        elif extractor == "SIFT":
+            extractor = SIFT(max_num_keypoints=max_num_kp).eval().cuda()
+            matcher   = LightGlue(features='sift', **_matcher).eval().cuda()
+        elif extractor == "ALIKED":
+            extractor = ALIKED(max_num_kp=max_num_kp).eval().cuda()
+            matcher   = LightGlue(features='aliked', **_matcher).eval().cuda()
+        else:
+            logger.error("Invalid keypoint extractor given, exiting.")
+            sys.exit()
+
+        fixed_np       = vid_stack[0]
+        fixed_image = numpy_image_to_torch(cv.cvtColor(fixed_np, cv.COLOR_GRAY2RGB)).cuda()
+        fixed_feats = extractor.extract(fixed_image)
+
+        for i, moving in tqdm(enumerate(vid_stack[1:], start=1), total=len(vid_stack)-1, desc="Glueing"):
+            moving_image = numpy_image_to_torch(cv.cvtColor(moving, cv.COLOR_GRAY2RGB)).cuda()
+            moving_feats = extractor.extract(moving_image)
+            matches      = matcher({'image0': fixed_feats, 'image1': moving_feats})
+
+            # Removing bin dimension
+            f_fixed, f_moved, matches01 = [rbd(x) for x in [fixed_feats, moving_feats, matches]]
+
+            matches      = matches01['matches'] # indices with shape (K,2)
+            points_fixed = f_fixed['keypoints'][matches[..., 0]]
+            points_moved = f_moved['keypoints'][matches[..., 1]]
+
+            H, _ = cv.findHomography(points_moved.cpu().numpy(), points_fixed.cpu().numpy(),
+                                     **_hom_config)
+
+            transformations.append(H)
+            moving_warp = cv.warpPerspective(moving, H, (fixed_np.shape[1], fixed_np.shape[0]))
+            vid_stack[i] = moving_warp
+        self._write_transformation_into_csv(transformations)
+        logger.info('Video successfully registered, saving as %s', self.vid_out)
+        np.save(self.vid_out, vid_stack)
+
 
     def _save_img_stack(self):
         print("TODO")

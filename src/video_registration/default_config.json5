@@ -1,0 +1,63 @@
+{
+  // Configuration parameters for running muDIC
+  mudic:{
+    // Determining the height and width of the searching box
+    box_h:75,
+    box_w:75,
+    // How many boxes in the x and y dimensions
+    num_elems_x:6,
+    num_elems_y:6,
+    // Maximum number of iterations before the DIC algorithm gives up
+    max_it:75,
+    // How often the reference image should be updated
+    ref_range:10
+  },
+  lightGlue:{
+    /*
+      Which extractor do you want to use. The options are the following:
+        SuperPoint: https://arxiv.org/abs/1712.07629
+        DISK: https://arxiv.org/abs/2006.13566
+        ALIKED: https://arxiv.org/abs/2304.03608
+        SIFT: https://www.cs.ubc.ca/~lowe/papers/ijcv04.pdf
+        DoGHardNet: https://github.com/DagnyT/hardnet */
+    extractor:'SuperPoint',
+    /*
+      Maximum number of keypoints the extractor should find.
+      Setting the parameter to null will result in the extractor returning ALL keypoints */
+    max_num_keypoints:null,
+    // Parameters for LightGlue
+    matcher:{
+      // Number of stacked self+cross attention layers. Reduce for faster inference at cost of accuracy
+      n_layers: 9,
+      // Enable FlashAttention. Increases speed and reduces memory consumption without impact of accuracy
+      flash: true,
+      // Enable mixed precision inference. False = off
+      mp: false,
+      // Controls the early stopping. Lower value means stopping more often at earlier layers
+      // Disable with -1
+      depth_confidence:0.95,
+      // Controls the iterative point pruning. Lower value prunes more points earlier
+      // Disable with -1
+      width_confidence:0.99,
+      // Match confidence, Increase this value to obtain less, but stronger matches
+      filter_threshold:0.1
+    },
+    // These are the parameters for estimating homography between 2 sets of keypoints.
+    homography:{
+      /*
+        Which method is used for computing a homography matrix. The following are possible:
+          RANSAC - RANSAC-based robust method
+          LMEDS  - Least-Median robust method
+          RHO    - PROSAC-based robust method */
+      method:"RANSAC",
+      /*
+        Maximum allowed reprojection error to treat a point pair as an inlier (used ONLY in the RANSAC and RHO methods).
+        Since the points are measured in pixels, the documentation recommends to set the parameter in range 1 to 10 */
+      ransacReprojThreshold:8.0,
+      // Confidence level, between 0 and 1
+      confidence:0.9999,
+      // Maximum number of RANSAC iterations
+      maxIters:10000,
+    }
+  }
+}
