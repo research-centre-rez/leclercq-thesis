@@ -1,3 +1,4 @@
+from enum import Enum
 import os
 import logging
 import csv
@@ -9,185 +10,214 @@ from utils.filename_builder import append_file_extension, create_out_filename
 from utils.pprint import pprint_dict
 from utils.prep_cap import prep_cap
 import utils.visualisers
-from video_processing.optical_flow import analyse_sparse_optical_flow, calculate_angular_movement, estimate_rotation_center, estimate_rotation_center_for_each_trajectory
+from video_processing.optical_flow import (
+    analyse_sparse_optical_flow,
+    calculate_angular_movement,
+    estimate_rotation_center_for_each_trajectory,
+)
 
-logger  = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
+
+class ProcessorMethod(Enum):
+    NONE = 0
+    OPT_FLOW = 1
+    APPROX = 2
+
 
 class VideoProcessor:
-    '''
+    """
     VideoProcessor class. This class is responsible for taking a video and performing user specified video processing on it. There are three options that the user can choose from: ['opt_flow', 'none', 'approx']. `opt_flow` performs optical flow on the video and then un-rotates it according to the data. `approx` will un-rotate based on the pre-calculated rotation that we got from the training data. `none` will just downscale the video and the appropriate sampling rate of the video.
-    '''
-    def __init__(self, method, config) -> None:
-        assert method in ['opt_flow', 'none', 'approx'], 'method parameter must be one of: opt_flow, approx, none'
+    """
 
+    def __init__(self, method:ProcessorMethod, config) -> None:
         # Due to some bugs with codecs, we are not able to keep the original 4k resolution
         # Therefore for downsampling this should be set to at least 2
-        self.config        = config
-        self.downscale_f   = self.config.get("downscale_factor")
-        self.sampling_rate = self.config.get("sampling_rate")
-        self.grayscale     = self.config.get("grayscale")
-        self.start_at      = self.config.get("start_at")
+        self.config = config
+        self.downscale_factor_out = self.config.get("downscale_factor")
+        self.sampling_rate_out = self.config.get("sampling_rate")
+        self.to_grayscale_out = self.config.get("grayscale")
+        self.start_at_frame = self.config.get("start_at")
+        self.fps_out = self.config.get("fps_out")
 
-        self.new_w   = None
-        self.new_h   = None
-        self.fps     = self.config.get("fps_out") // self.sampling_rate
-        self.vid_in  = None
-        self.vid_out = None
-        self.cap_in  = None
-        self.writer  = None
-        self.total   = 0
-        self.cap_w   = 0
-        self.cap_h   = 0
+        if method == ProcessorMethod.OPT_FLOW:
+            self.method = self._get_optical_flow_analysis
+        elif method == ProcessorMethod.APPROX:
+            self.method = self._get_estimate_analysis
+        elif method == ProcessorMethod.NONE:
+            self.method = self._get_none_analysis
 
-        if method == 'opt_flow':
-            self.method = self._optical_flow
-        elif method == 'approx':
-            self.method = self._guesstimate
-        else:
-            self.method = self._no_process
+    def get_rotation_analysis(self, video_path: str) -> dict:
+        """
+        Calculates rotation analysis for a given video, based on what is specified at initialisation.
+        Args:
+            video_path (str): path to the video to be analysed
+        Returns:
+            A dictionary with two keys: `center` and `angles`. These contain the rotation centre and the rotation angles for each frame in the input video.
+        """
 
+        center, angles = self.method(video_path)
+        analysis = {"center": center, "angles": angles}
 
-    def process_video(self, video_path, out_path) -> None:
-        '''
-        This is how the user should be interacting with this class. They specify the methods etc. when initialising the object and then process a video with `.process_video`
-        '''
-        self.vid_in  = video_path
-        self.vid_out = out_path
+        return analysis
 
-        self.cap_in = prep_cap(video_path, self.start_at)
+    def write_out_video(self, source_path: str, analysis: dict, save_as: str) -> None:
+        """
+        Corrects the rotation of `source_path` with the use of `analysis`, saving the result as `save_as`
+        Args:
+            source_path (str): Path to the input video
+            analysis (dict): Analysis that is obtained from `self.get_rotation_analysis`
+            save_as (str): How do you want to save the new video.
+        Returns:
+            None. However it does save the new video and also flattened homography transformations as a csv file.
+        """
 
-        self.fps = self.cap_in.get(cv.CAP_PROP_FPS)
-        self.cap_w  = int(self.cap_in.get(cv.CAP_PROP_FRAME_WIDTH))
-        self.cap_h  = int(self.cap_in.get(cv.CAP_PROP_FRAME_HEIGHT))
+        angle_idx = 0
+        angle = np.float64(0.0)
 
-        self.new_w = int(self.cap_w // self.downscale_f)
-        self.new_h = int(self.cap_h // self.downscale_f)
+        src_capture = prep_cap(source_path, self.start_at_frame)
+        total_frame_count = int(
+            src_capture.get(cv.CAP_PROP_FRAME_COUNT) - self.start_at_frame
+        )
 
-        fourcc = cv.VideoWriter_fourcc(*'mp4v')
-        self.writer = cv.VideoWriter(out_path, fourcc, self.fps, (self.new_w, self.new_h))
-        self.total = int(self.cap_in.get(cv.CAP_PROP_FRAME_COUNT)) - self.start_at
+        assert (
+            len(analysis["angles"]) == total_frame_count
+        ), "Length of angles is not the same as video length"
 
-        self.method()
+        # Information about dimensions
+        capture_width = int(src_capture.get(cv.CAP_PROP_FRAME_WIDTH))
+        capture_height = int(src_capture.get(cv.CAP_PROP_FRAME_HEIGHT))
+        frame_width_out = int(capture_width // self.downscale_factor_out)
+        frame_height_out = int(capture_height // self.downscale_factor_out)
 
+        # Get cv.VideoWriter
+        fourcc = cv.VideoWriter_fourcc(*"mp4v")
+        writer_out = cv.VideoWriter(
+            save_as, fourcc, self.fps_out, (frame_width_out, frame_height_out)
+        )
 
-    def _optical_flow(self):
-        '''
-        Performs optical flow on the the video.
-        '''
+        # Write out the processed video
+        transformations = []
+        with tqdm(desc="Correcting rotation", total=total_frame_count) as pbar:
+            i = 0
+            while True:
+                ret, frame = src_capture.read()
+
+                if not ret or angle_idx >= len(analysis["angles"]):
+                    break
+
+                angle += analysis["angles"][angle_idx]
+                angle_idx += 1
+
+                if self.sampling_rate_out != 1 and i % self.sampling_rate_out != 0:
+                    i += 1
+                    pbar.update(1)
+                    continue
+
+                if self.to_grayscale_out:
+                    frame = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
+                    frame = cv.cvtColor(frame, cv.COLOR_GRAY2BGR)
+
+                M = cv.getRotationMatrix2D(
+                    center=analysis["center"], angle=angle, scale=1
+                )
+                rotated_frame = cv.warpAffine(frame, M, (capture_width, capture_height))
+                scaled_frame = cv.resize(
+                    rotated_frame, (frame_width_out, frame_height_out)
+                )
+
+                writer_out.write(scaled_frame)
+                transformations.append(M)
+                pbar.set_postfix(angle=f"{angle:.4f}")
+                pbar.update(1)
+                i += 1
+
+        writer_out.release()
+        src_capture.release()
+        logger.info("Video saved in %s", save_as)
+        self._write_trans_into_csv(transformations, save_as)
+
+    def _get_optical_flow_analysis(self, video_path):
+        """
+        Performs optical flow analysis on the the video.
+        """
         opt_flow_params = self.config.get("opt_flow_params")
-        f_params   = opt_flow_params["f_params"]
-        lk_params  = opt_flow_params['lk_params']
+        f_params = opt_flow_params["f_params"]
+        lk_params = opt_flow_params["lk_params"]
 
-        np_trajectories = analyse_sparse_optical_flow(self.vid_in,
-                                                      lk_params=lk_params,
-                                                      f_params=f_params,
-                                                      start_at=self.start_at)
+        np_trajectories = analyse_sparse_optical_flow(
+            video_path,
+            lk_params=lk_params,
+            f_params=f_params,
+            start_at=self.start_at_frame,
+        )
 
-        center, quality = estimate_rotation_center_for_each_trajectory(np_trajectories)
+        center, quality = estimate_rotation_center_for_each_trajectory(np_trajectories, 'mean')
         logger.info("Estimated rotation center: (%s, %s)", center[0], center[1])
         logger.info("Center quality metric: %s (lower is better)", quality)
 
         rotation_res = calculate_angular_movement(np_trajectories, center)
 
-        base, _ = os.path.splitext(self.vid_in)
+        base, _ = os.path.splitext(video_path)
 
         graph_config = {
-            'save_as': create_out_filename(base, [], ['of', 'analysis']),
-            'save': True,
-            'show': False
+            "save_as": create_out_filename(base, [], ["optical", "flow", "analysis"]),
+            "save": True,
+            "show": False,
         }
-        logger.info('Saving rotation analysis graph')
-        utils.visualisers.visualize_rotation_analysis(np_trajectories, rotation_res, graph_config=graph_config)
-        angles = rotation_res['average_angle_per_frame_deg']
-        self._rotate_around_center(center, angles, 'optical flow')
+        logger.info("Saving rotation analysis graph")
+        utils.visualisers.visualize_rotation_analysis(
+            np_trajectories, rotation_res, graph_config=graph_config
+        )
+        angles = rotation_res["average_angle_per_frame_deg"]
 
+        return center, angles
 
-    def _guesstimate(self):
+    def _get_none_analysis(self, video_path):
+        """
+        Performs basic video processing (subsampling, downscale etc..). In order to not copy code, it gets passed into _rotated_around_center with 0 angle rotation.
+        """
+        cap = prep_cap(video_path, 0)
+        total_frames = int(cap.get(cv.CAP_PROP_FRAME_COUNT) - self.start_at_frame)
+        center = (0, 0)
+        angles = [0 for _ in range(total_frames)]
+
+        return center, angles
+
+    def _get_estimate_analysis(self, video_path):
+        """
+        Rotation around a fixed center, under the assumption that each frame is rotated by a fixed angle.
+        """
         estimate_params = self.config.get("estimate_params")
-        center_offset   = np.array(estimate_params["center_offset"])
-        center_offset   = center_offset / self.downscale_f
-        rot_per_frame   = estimate_params["rotation_per_frame"]
 
-        center_x        = self.cap_w // 2
-        center_y        = self.cap_h // 2
-        rotation_center = center_offset + (center_x, center_y)
-        logger.info('Rotation center: %s', rotation_center)
-        logger.info('Rotation per frame: %s', rot_per_frame)
+        rotation_center = estimate_params["rotation_center"]
+        rotation_center = np.array((rotation_center["x"], rotation_center["y"]))
+        rot_per_frame = estimate_params["rotation_per_frame"]
+
+        cap = prep_cap(video_path)
+        frame_count = int(cap.get(cv.CAP_PROP_FRAME_COUNT)) - self.start_at_frame
+
+        logger.info("Rotation center: %s", rotation_center)
+        logger.info("Rotation per frame: %s", rot_per_frame)
 
         angles = [0]
-        angles.extend([rot_per_frame for _ in range(self.total - 1)])
+        angles.extend([rot_per_frame for _ in range(frame_count - 1)])
 
-        self._rotate_around_center(rotation_center, angles, 'approximation')
+        return rotation_center, angles
 
+    def _write_trans_into_csv(self, transformations: list[np.ndarray], out_file_name):
+        """
+        Writes out the transformation matrices into a csv file.
+        """
+        base, _ = os.path.splitext(out_file_name)
 
-    def _no_process(self):
-        '''
-        Performs basic video processing (subsampling, downscale etc..). In order to not copy code, it gets passed into _rotated_around_center with 0 angle rotation.
-        '''
-        center = (0,0)
-        angles = [0 for i in range(self.total)]
-        self._rotate_around_center(center, angles, 'no un-rotating')
+        save_as = create_out_filename(base, [], ["transformations"])
+        save_as = append_file_extension(save_as, ".csv")
 
-
-    def _rotate_around_center(self, center, angles, name):
-        '''
-        Writes out the resulting video. Uses the configuration specified to also apply grayscale, sampling rate and downscale factor. 
-        '''
-
-        angle_idx = 0
-        angle     = np.float64(0.0)
-
-        logger.info('Correct number of angles: %s', len(angles) == self.total)
-
-        transformations = []
-        with tqdm(desc=f'Un-rotating with {name}', total=self.total) as pbar:
-            i = 0
-            while True:
-                ret, frame = self.cap_in.read()
-
-                if not ret or angle_idx >= len(angles):
-                    break
-
-                angle     += angles[angle_idx]
-                angle_idx += 1
-
-                if self.sampling_rate != 1 and i % self.sampling_rate != 0:
-                    i += 1
-                    pbar.update(1)
-                    continue
-
-                if self.grayscale:
-                    frame = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
-                    frame = cv.cvtColor(frame, cv.COLOR_GRAY2BGR)
-
-                M             = cv.getRotationMatrix2D(center=center, angle=angle, scale=1)
-                rotated_frame = cv.warpAffine(frame, M, (self.cap_w, self.cap_h))
-                scaled_frame  = cv.resize(rotated_frame, (self.new_w, self.new_h))
-
-
-                self.writer.write(scaled_frame)
-                transformations.append(M)
-                pbar.set_postfix(angle=f'{angle:.4f}')
-                pbar.update(1)
-                i +=1
-
-        self.writer.release()
-        self.cap_in.release()
-        logger.info('Video saved in %s', self.vid_out)
-        self._write_trans_into_csv(transformations) # Write transformations to a csv file
-
-
-    def _write_trans_into_csv(self, transformations:list[np.ndarray]):
-        base, _ = os.path.splitext(self.vid_out)
-
-        save_as = create_out_filename(base, [], ['transformations'])
-        save_as = append_file_extension(save_as, '.csv')
-
-        with open(save_as, 'w', newline='') as f:
+        with open(save_as, "w", newline="") as f:
             writer = csv.writer(f)
-            writer.writerow(['frame_id','m00','m01','m02','m10','m11','m12'])
+            writer.writerow(["frame_id", "m00", "m01", "m02", "m10", "m11", "m12"])
 
             for i, M in enumerate(transformations):
                 writer.writerow([i] + M.ravel().tolist())
 
-        logger.info('Stored csv data about transformations in %s', save_as)
+        logger.info("Stored csv data about transformations in %s", save_as)

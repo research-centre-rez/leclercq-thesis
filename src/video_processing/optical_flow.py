@@ -1,5 +1,6 @@
 import sys
 import logging
+from enum import Enum
 
 from circle_fit.circle_fit import taubinSVD
 import cv2 as cv
@@ -7,6 +8,10 @@ import numpy as np
 from tqdm import tqdm
 
 from utils.prep_cap import prep_cap
+
+class Format(Enum):
+    MEAN = 0
+    MEDIAN = 1
 
 # TODO: I might add the circle centers to utils/ eventually but right now its only being used here
 def fit_circle_from_points(points: np.ndarray):
@@ -24,13 +29,13 @@ def fit_circle_from_points(points: np.ndarray):
 
 
 def estimate_rotation_center_for_each_trajectory(
-    trajectories: list[np.ndarray], return_mean=True
+    trajectories: list[np.ndarray], output_format:str
 ):
     """
-    Estimates center for each of the trajectories, returns their mean or median.
+    Given a set of trajectories that we get from optical flow, estimate a center of rotation. Returns their mean or median.
     Args:
-        trajectories (list[np.ndarray]): List of trajectories, each one containing an `np.ndarray` that describes the trajectory of the point.
-        return_mean: Whether to return mean or median of the circles
+        trajectories (list[np.ndarray]): List of trajectories, each one containing an `np.ndarray` that describes the trajectory of the point through the video frames.
+        output_format (str): Whether to use median for the estimation or mean. Pass in either 'median' or 'mean'. 
     Returns:
         center: Of all the trajectories
         error: Mean / median of the residual errors
@@ -50,10 +55,13 @@ def estimate_rotation_center_for_each_trajectory(
     err_arr = np.array(err)
     centers_arr = np.array(centers)
 
-    if return_mean:
+    out_format = Format[output_format.upper()]
+
+    if out_format == Format.MEAN:
         center = centers_arr.mean(axis=0)
         error = err_arr.mean()
         return center, error
+
 
     center = np.median(centers_arr, axis=0)
     error = np.median(err_arr)
@@ -70,7 +78,7 @@ def estimate_rotation_center(trajectories):
 
     Returns:
         tuple: (center_x, center_y) - the estimated center of rotation
-        float: redidual error
+        float: redidual error for each trajectory
     """
     # Combine all trajectory points for initial guess
     all_points = np.vstack([traj for traj in trajectories])
@@ -84,7 +92,7 @@ def estimate_rotation_center(trajectories):
 
 def calculate_angular_movement(trajectories, center):
     """
-    Calculates angular movement for optical flow around a center of rotation. The coordinates are in the coordinate system of the video.
+    Calculates angular movement for optical flow around a center of rotation. The coordinates are in the coordinate system of the video frame (i.e. [0,0] is left top corner, first coordinate corresponds with the x-axis).
     """
     center_x, center_y = center
 
@@ -93,12 +101,12 @@ def calculate_angular_movement(trajectories, center):
     frame_angles = [[] for _ in range(max_frames - 1)]
     all_angles   = []  # list of all trajectories and their respective angle changes
 
-    for traj in trajectories:
-        if len(traj) < 2:
+    for trajectory in trajectories:
+        if len(trajectory) < 2:
             continue
 
-        dx = traj[:, 0] - center_x
-        dy = traj[:, 1] - center_y
+        dx = trajectory[:, 0] - center_x
+        dy = trajectory[:, 1] - center_y
 
         angles = np.arctan2(dy, dx)
 
@@ -134,8 +142,8 @@ def calculate_angular_movement(trajectories, center):
         "average_angle_per_frame_deg": avg_angle_per_frame_deg,
         "variance_angle_per_frame": var_angle_per_frame,
         "cumulative_angles_deg": cum_angles_deg,
-        "mean_angular_velocity_deg_per_frame": np.mean(avg_angle_per_frame_deg),
-        "median_angular_velocity_deg_per_frame": np.median(avg_angle_per_frame_deg),
+        "mean_angular_velocity_deg_per_frame": np.nanmean(avg_angle_per_frame_deg),
+        "median_angular_velocity_deg_per_frame": np.nanmedian(avg_angle_per_frame_deg),
         "total_rotation_deg": cum_angles_deg[-1],
         "frame_count": max_frames,
     }
@@ -143,15 +151,16 @@ def calculate_angular_movement(trajectories, center):
 
 
 def analyse_sparse_optical_flow(
-    vid_path, start_at, f_params=None, lk_params=None
+    vid_path:str, start_at:int, f_params:dict, lk_params:dict
 ) -> list[np.ndarray]:
     """
     Analyses optical flow in a video by tracking feature points. Can be used for registered and non-registered videos. In a registered video this will effectively measure how well is the video registered, in a non-registered video it will measure the optical flow of the video.
 
     Args:
         video_path (str): Path to the video
-        num_points (int): Number of feature points to track
-        plot_results (bool): Whether to plot the results
+        start_at (int): Frame where optical flow analysis will be started from
+        f_params (dict): Parameters for feature detection
+        lk_params (dict): Parameters for the Lukas-Kanade optical flow
 
     Returns:
         List of all trajectories
@@ -232,9 +241,9 @@ def analyse_sparse_optical_flow(
     # Not converting directly to an np array because it is
     # not guaranteed that all trajectories have the same length
     np_trajectories = []
-    for traj in trajectories:
-        logger.debug("Length of trajectory %s", len(traj))
-        if len(traj) > 0:
-            np_trajectories.append(np.array(traj))
+    for trajectory in trajectories:
+        logger.debug("Length of trajectory %s", len(trajectory))
+        if len(trajectory) > 0:
+            np_trajectories.append(np.array(trajectory))
 
     return np_trajectories

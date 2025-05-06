@@ -10,6 +10,7 @@ from jsonschema.exceptions import ValidationError
 from utils import pprint
 from utils.filename_builder import append_file_extension, create_out_filename
 from video_processing import VideoProcessor
+from video_processing import ProcessorMethod
 
 CONFIG_SCHEMA = {
     "type": "object",
@@ -18,7 +19,7 @@ CONFIG_SCHEMA = {
         "sampling_rate": {"type": "integer"}, # taking every ith frame from the original video
         "downscale_factor": {"type": "integer"}, # how much should the resolution be downscaled
         "grayscale": {"type": "boolean"}, # whether the out video is grayscale or not
-        "start_at": {"type": "integer"}, # where should the video start
+        "start_at": {"type": "integer"}, # frame at which the new video will start
         "opt_flow_params": {
                 "type": "object",
                 "properties": {
@@ -57,11 +58,14 @@ CONFIG_SCHEMA = {
     },
     "estimate_params": {
             "type": "object",
-            "center_offset": {"type": "array",
-                              "items": [
-                                {"type": "float"},
-                                {"type": "float"}
-                              ]},
+            "rotation_center": {"type": "object",
+                              "x": {"type": "float"},
+                              "y": {"type": "float"},
+                              "required": [
+                              "x",
+                              "y"
+                              ]
+                              },
             "rotation_per_frame": {"type": "float"},
             "required": [
                 "center_offset",
@@ -82,7 +86,7 @@ CONFIG_SCHEMA = {
 
 def parse_args():
     argparser = argparse.ArgumentParser(
-        description="Program for processing a single video, interacts with the video_processor class API",
+        description="Program that is used for performing rotation correction on a given video. The new video will be saved separately.",
         formatter_class=argparse.RawTextHelpFormatter
     )
 
@@ -92,14 +96,17 @@ def parse_args():
 
     # Required arguments
     req.add_argument(
-        "-i", "--input", type=str, required=True, help="Path to the input video"
+        "-i", "--input", type=str, required=True, help="Relative (or absolute) path to the video you want to process. Example: --i ../data/1/1-part0.mp4"
     )
     req.add_argument(
         "-o",
         "--output",
         type=str,
         required=True,
-        help="Where do you want the video to be saved",
+        help=(
+            "Where do you want the video to be saved. If 'auto' is passed, the program will automatically construct the name of the output file.\n"
+            " Example #1: --o auto -> will automatically append '-processed' to the input file and save it like that.\n"
+            " Example #2: --o ../data/tmp.mp4 -> store the video as 'tmp.mp4' at the location '../data/'.")
     )
     req.add_argument(
         "--method",
@@ -117,7 +124,7 @@ def parse_args():
         "--config",
         default="./video_processing/default_config.json5",
         type=str,
-        help="Path to a JSON config file that follows the config schema for video processing.",
+        help="Path to a JSON config file that follows the config schema for video processing. The default config schema can be found in './video_process/default_config.json5'",
     )
 
     return argparser.parse_args()
@@ -144,13 +151,16 @@ def main(args):
         logger.error("Invalid configuration: \n %s", e.message)
         sys.exit(1)
 
-    proc = VideoProcessor(method=args.method, config=config)
 
     if args.output in ["auto", "automatic"]:
         base, _ = os.path.splitext(args.input)
         save_as = create_out_filename(base, [], ["preprocessed"])
         args.output = append_file_extension(save_as, "mp4")
-    proc.process_video(args.input, args.output)
+
+    proc = VideoProcessor(method=ProcessorMethod[args.method.upper()], config=config)
+    
+    analysis = proc.get_rotation_analysis(args.input)
+    proc.write_out_video(args.input, analysis, args.output)
 
 
 if __name__ == "__main__":

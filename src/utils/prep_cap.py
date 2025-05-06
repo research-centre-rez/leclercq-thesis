@@ -2,7 +2,7 @@ import sys
 import logging
 import cv2 as cv
 
-def prep_cap(video_path:str, set_to=15) -> cv.VideoCapture:
+def prep_cap(video_path:str, set_to=0) -> cv.VideoCapture:
     '''
     Helper function that will set the video capture to start on frame `set_to`. This is because we want to discard first `n` frames of a video due to image balancing noise.
     '''
