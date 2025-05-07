@@ -26,10 +26,22 @@ class ProcessorMethod(Enum):
 
 class VideoProcessor:
     """
-    VideoProcessor class. This class is responsible for taking a video and performing user specified video processing on it. There are three options that the user can choose from: ['opt_flow', 'none', 'approx']. `opt_flow` performs optical flow on the video and then un-rotates it according to the data. `approx` will un-rotate based on the pre-calculated rotation that we got from the training data. `none` will just downscale the video and the appropriate sampling rate of the video.
+    VideoProcessor class. The role of this class is to take a video and perform video processing on it, mainly rotation correction, downscaling, subsampling and grayscaling the resulting video.The user has three options:
+        `ProcessorMethod.NONE`: No rotation correction is performed.
+        `ProcessorMethod.APPROX`: Rotation correction with the assumption that each frame is rotated by a fixed angle, around a fixed center of rotation.
+        `ProcessorMethod.OPT_FLOW`: Perform optical flow, then do rotation correction based on that. This yields the best results for rotation correction.
+    All the other procesing methods such as downscaling, subsampling etc. are method agnostic. They will happen no matter what method you choose.
     """
 
-    def __init__(self, method:ProcessorMethod, config) -> None:
+    def __init__(self, method:ProcessorMethod, config:dict) -> None:
+        '''
+        Init function. Here you set which method you want the processor to use and a corresponding config.
+        Args:
+            `method` (ProcessorMethod): which method do you want to use for processing videos
+            `config` (dict): Config file containing parameters for the video processing
+        Returns:
+            None
+        '''
         # Due to some bugs with codecs, we are not able to keep the original 4k resolution
         # Therefore for downsampling this should be set to at least 2
         self.config = config
