@@ -1,0 +1,70 @@
+{
+    "type": "object",
+    "properties": {
+        "fps_out": {"type": "integer"},
+        "sampling_rate": {"type": "integer"},
+        "downscale_factor": {"type": "integer"},
+        "grayscale": {"type": "boolean"},
+        "start_at": {"type": "integer"},
+        "opt_flow_params": {
+                "type": "object",
+                "properties": {
+                    "f_params": {
+                        "type": "object",
+                        "properties": {
+                            "maxcorners": {"type": "integer"},
+                            "qualitylevel": {"type": "number"},
+                            "mindistance": {"type": "integer"},
+                            "blocksize": {"type": "integer"}
+                        },
+                        "required": ["maxCorners", "qualityLevel", "minDistance", "blockSize"]
+                    },
+                    "lk_params": {
+                        "type": "object",
+                        "properties": {
+                            "winsize": {
+                                "type": "array",
+                                "items": {"type": "integer"},
+                                "minitems": 2,
+                                "maxitems": 2
+                            },
+                            "maxlevel": {"type": "integer"},
+                            "criteria": {
+                                "type": "array",
+                                "items": {"type": "number"},
+                                "minitems": 3,
+                                "maxitems": 3
+                            }
+                        },
+                        "required": ["winSize", "maxLevel", "criteria"]
+                }
+            },
+            "required": ["f_params", "lk_params"]
+        }
+    },
+    "approximation_params": {
+            "type": "object",
+            "rotation_center": {"type": "object",
+                              "x": {"type": "float"},
+                              "y": {"type": "float"},
+                              "required": [
+                              "x",
+                              "y"
+                              ]
+                              },
+            "rotation_per_frame": {"type": "float"},
+            "required": [
+                "center_offset",
+                "rotation_per_frame"
+            ]
+    },
+    "required": [
+        "fps_out",
+        "sampling_rate",
+        "downscale_factor",
+        "grayscale",
+        "start_at",
+        "opt_flow_params",
+        "approximation_params"
+    ]
+}
