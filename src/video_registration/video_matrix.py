@@ -6,7 +6,7 @@ from tqdm import tqdm
 logger = logging.getLogger(__name__)
 
 
-def create_video_matrix(vid_path:str, grayscale:bool) -> np.ndarray:
+def create_video_matrix(vid_path: str, grayscale: bool) -> np.ndarray:
     """
     This function loads a video into a matrix where each row is a frame in the video.
 

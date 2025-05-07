@@ -12,7 +12,7 @@ from video_registration import RegMethod, VideoRegistrator
 def parse_args():
     argparser = argparse.ArgumentParser(
         description="Program for registering a single video. Stores the registered video as a numpy matrix where each row represents one frame of the video. Default config can be found in video_registration/default_config.json",
-        formatter_class=argparse.RawTextHelpFormatter
+        formatter_class=argparse.RawTextHelpFormatter,
     )
 
     argparser._action_groups.pop()
@@ -36,7 +36,7 @@ def parse_args():
             "Where do you want the registered matrix to be saved. If 'auto' is passed, the program will automatically construct the name of the output file.\n"
             "  Example #1: --o auto -> will automatically append _registered_stack to the output file \n"
             "  Example #2: --o ../data/tmp_registered will save the registered matrix as ../data/tmp_registered.npy"
-        )
+        ),
     )
     required.add_argument(
         "-m",
@@ -49,7 +49,7 @@ def parse_args():
             "  orb: Performs ORB finding and matching of keypoints.\n"
             "  mudic: Performs digital image correlation for video registration.\n"
             "  lightglue: Performs registration with the use of the LightGlue neural network."
-        )
+        ),
     )
 
     optional.add_argument(
@@ -92,6 +92,7 @@ def main(args):
     reg = VideoRegistrator(method=args.method, config=config)
 
     registered_stack = reg.get_registered_block(args.input)
+    reg.save_registered_block(registered_stack, args.output)
 
 
 if __name__ == "__main__":

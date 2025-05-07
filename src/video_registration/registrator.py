@@ -84,30 +84,31 @@ class VideoRegistrator:
             extractor_name=extractor, matcher_config=_matcher, max_num_kp=max_num_kp
         )
 
-
         # Parsing the human-readable string into an opencv enum
         _hom_config["method"] = getattr(cv, _hom_config["method"])
 
         # First image in the sequence has no transformation
         transformations = [np.eye(3, 3)]
 
-        vid_stack = create_video_matrix(input_video, grayscale=True)
+        vid_stack = create_video_matrix(input_video, grayscale=False)
 
         logger.info("Initialising the extractor and matcher")
 
         fixed_np = vid_stack[0]
 
         fixed_image = numpy_image_to_torch(
-            cv.cvtColor(fixed_np, cv.COLOR_GRAY2RGB)
+            cv.cvtColor(fixed_np, cv.COLOR_BGR2RGB)
         ).cuda()
         fixed_feats = extractor.extract(fixed_image)
 
         with torch.no_grad():
             for i, moving in tqdm(
-                enumerate(vid_stack[1:], start=1), total=len(vid_stack) - 1, desc="Glueing"
+                enumerate(vid_stack[1:], start=1),
+                total=len(vid_stack) - 1,
+                desc="Glueing",
             ):
                 moving_image = numpy_image_to_torch(
-                    cv.cvtColor(moving, cv.COLOR_GRAY2RGB)
+                    cv.cvtColor(moving, cv.COLOR_BGR2RGB)
                 ).cuda()
                 moving_feats = extractor.extract(moving_image)
                 matches = matcher({"image0": fixed_feats, "image1": moving_feats})
@@ -121,8 +122,10 @@ class VideoRegistrator:
                 points_fixed = f_fixed["keypoints"][matches[..., 0]]
                 points_moved = f_moved["keypoints"][matches[..., 1]]
 
-                H, _ = cv.cuda.findHomography(
-                    points_moved.cpu().numpy(), points_fixed.cpu().numpy(), **_hom_config
+                H, _ = cv.findHomography(
+                    points_moved.cpu().numpy(),
+                    points_fixed.cpu().numpy(),
+                    **_hom_config
                 )
 
                 transformations.append(H)
@@ -156,40 +159,24 @@ class VideoRegistrator:
         else:
             logger.error("Invalid keypoint extractor given, exiting.")
             sys.exit()
+
+        matcher.compile(mode="reduce-overhead")
         return extractor, matcher
 
-    def register_video(self, vid_path, out_path):
+    def _get_mudic_registration(self, input_video):
         """
-        Registers a video into a numpy stack.
+        Performs video registration with the use of muDIC.
         """
-        self.vid_in = vid_path
-        self.vid_out = out_path
 
-        self.cap_in = prep_cap(vid_path, set_to=0)
-
-        self.frame_h = int(self.cap_in.get(cv.CAP_PROP_FRAME_HEIGHT))
-        self.frame_w = int(self.cap_in.get(cv.CAP_PROP_FRAME_WIDTH))
-
-        self.method()
-
-    def _orb(self):
-        print("TODO")
-
-    def _mudic(self):
         mudic_config = self.config.get("mudic")
-        pprint_dict(mudic_config, "mudic in reg", logger)
 
-        vid_stack = create_video_matrix(self.vid_in, grayscale=True)
+        vid_stack = create_video_matrix(input_video, grayscale=True)
         image_stack = dic.image_stack_from_list(list(vid_stack))
 
+        frame_h, frame_w = vid_stack.shape[1:]
+
         mesh = create_mesh(
-            self.frame_h,
-            self.frame_w,
-            image_stack,
-            mudic_config.get("box_h"),
-            mudic_config.get("box_w"),
-            mudic_config.get("num_elems_x"),
-            mudic_config.get("num_elems_y"),
+            frame_h, frame_w, image_stack, **mudic_config.get("mesh_parameters")
         )
 
         displacement = correlate_matrix(
@@ -201,8 +188,7 @@ class VideoRegistrator:
         logger.info("mudic finished succesfully")
         vid_stack = self._shift_by_vector(vid_stack, meds)
 
-        np.save(self.vid_out, vid_stack)
-        logger.info("Registered video saved to %s", self.vid_out)
+        return vid_stack
 
     def _shift_by_vector(self, image_stack, displacement):
         n, h, w = image_stack.shape
@@ -231,74 +217,6 @@ class VideoRegistrator:
         xc, yc, _, _, _ = model.params
 
         return xc, yc
-
-    def _lightglue(self):
-        _lglue_config = self.config.get("lightGlue")
-        _hom_config = _lglue_config["homography"]
-        _matcher = _lglue_config["matcher"]
-        extractor = _lglue_config["extractor"]
-        max_num_kp = _lglue_config["max_num_keypoints"]
-
-        # Parsing the human-readable string into an opencv enum
-        _hom_config["method"] = getattr(cv, _hom_config["method"])
-
-        transformations = [np.eye(3, 3)]
-
-        vid_stack = create_video_matrix(self.vid_in, grayscale=True)
-
-        logger.info("Initialising the extractor and matcher")
-        if extractor == "SuperPoint":
-            extractor = SuperPoint(max_num_keypoints=max_num_kp).eval().cuda()
-            matcher = LightGlue(features="superpoint", **_matcher).eval().cuda()
-        elif extractor == "DISK":
-            extractor = DISK(max_num_keypoints=max_num_kp).eval().cuda()
-            matcher = LightGlue(features="disk", **_matcher).eval().cuda()
-        elif extractor == "SIFT":
-            extractor = SIFT(max_num_keypoints=max_num_kp).eval().cuda()
-            matcher = LightGlue(features="sift", **_matcher).eval().cuda()
-        elif extractor == "ALIKED":
-            extractor = ALIKED(max_num_kp=max_num_kp).eval().cuda()
-            matcher = LightGlue(features="aliked", **_matcher).eval().cuda()
-        else:
-            logger.error("Invalid keypoint extractor given, exiting.")
-            sys.exit()
-
-        fixed_np = vid_stack[0]
-        fixed_image = numpy_image_to_torch(
-            cv.cvtColor(fixed_np, cv.COLOR_GRAY2RGB)
-        ).cuda()
-        fixed_feats = extractor.extract(fixed_image)
-
-        for i, moving in tqdm(
-            enumerate(vid_stack[1:], start=1), total=len(vid_stack) - 1, desc="Glueing"
-        ):
-            moving_image = numpy_image_to_torch(
-                cv.cvtColor(moving, cv.COLOR_GRAY2RGB)
-            ).cuda()
-            moving_feats = extractor.extract(moving_image)
-            matches = matcher({"image0": fixed_feats, "image1": moving_feats})
-
-            # Removing bin dimension
-            f_fixed, f_moved, matches01 = [
-                rbd(x) for x in [fixed_feats, moving_feats, matches]
-            ]
-
-            matches = matches01["matches"]  # indices with shape (K,2)
-            points_fixed = f_fixed["keypoints"][matches[..., 0]]
-            points_moved = f_moved["keypoints"][matches[..., 1]]
-
-            H, _ = cv.findHomography(
-                points_moved.cpu().numpy(), points_fixed.cpu().numpy(), **_hom_config
-            )
-
-            transformations.append(H)
-            moving_warp = cv.warpPerspective(
-                moving, H, (fixed_np.shape[1], fixed_np.shape[0])
-            )
-            vid_stack[i] = moving_warp
-        self._write_transformation_into_csv(transformations)
-        logger.info("Video successfully registered, saving as %s", self.vid_out)
-        np.save(self.vid_out, vid_stack)
 
     def _write_transformation_into_csv(self, trans: list[np.ndarray]):
         base, _ = os.path.splitext(self.vid_out)

@@ -1,12 +1,15 @@
 {
   // Configuration parameters for running muDIC
   mudic:{
-    // Determining the height and width of the searching box
-    box_h:75,
-    box_w:75,
-    // How many boxes in the x and y dimensions
-    num_elems_x:6,
-    num_elems_y:6,
+    // Parameters for the digital image correlation mesh
+    mesh_parameters: {
+      // Box height and width, in pixels
+      box_h:75,
+      box_w:75,
+      // How many boxes in the x and y dimensions
+      num_elems_x:6,
+      num_elems_y:6
+    },
     // Maximum number of iterations before the DIC algorithm gives up
     max_it:75,
     // How often the reference image should be updated
@@ -31,7 +34,7 @@
       n_layers: 9,
       // Enable FlashAttention. Increases speed and reduces memory consumption without impact of accuracy
       flash: true,
-      // Enable mixed precision inference. False = off
+      // Enable mixed precision inference. Default is False = off
       mp: false,
       // Controls the early stopping. Lower value means stopping more often at earlier layers
       // Disable with -1
