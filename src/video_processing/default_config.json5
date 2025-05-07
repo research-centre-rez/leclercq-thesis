@@ -3,7 +3,7 @@
 // source for LK optical flow: https://docs.opencv.org/3.4/dc/d6b/group__video__track.html#ga473e4b886d0bcc6b65831eb88ed93323
 {
   // Set the fps of the out video
-  fps_out:25,
+  fps_out: 25.0,
   // The out video will take every nth frame from the source video. 1 = every frame
   sampling_rate: 4,
   /*

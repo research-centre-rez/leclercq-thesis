@@ -1,9 +1,9 @@
 {
     "type": "object",
     "properties": {
-        "fps_out": {"type": "integer"},
+        "fps_out": {"type": "number"},
         "sampling_rate": {"type": "integer"},
-        "downscale_factor": {"type": "integer"},
+        "downscale_factor": {"type": "number"},
         "grayscale": {"type": "boolean"},
         "start_at": {"type": "integer"},
         "opt_flow_params": {
@@ -45,14 +45,14 @@
     "approximation_params": {
             "type": "object",
             "rotation_center": {"type": "object",
-                              "x": {"type": "float"},
-                              "y": {"type": "float"},
+                              "x": {"type": "number"},
+                              "y": {"type": "number"},
                               "required": [
-                              "x",
-                              "y"
+                                "x",
+                                "y"
                               ]
                               },
-            "rotation_per_frame": {"type": "float"},
+            "rotation_per_frame": {"type": "number"},
             "required": [
                 "center_offset",
                 "rotation_per_frame"
