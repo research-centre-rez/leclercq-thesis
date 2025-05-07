@@ -59,8 +59,8 @@
       criteria: [3, 15, 0.01]
     }
   },
-  // Parameters for the default estimation
-  estimate_params: {
+  // Parameters for the simplest approximation
+  approximation_params: {
     // Rotation centre in the coordinates of the original video pa
     rotation_center:
     {

@@ -18,6 +18,7 @@ from video_processing.optical_flow import (
 
 logger = logging.getLogger(__name__)
 
+
 class ProcessorMethod(Enum):
     NONE = 0
     OPT_FLOW = 1
@@ -33,15 +34,15 @@ class VideoProcessor:
     All the other procesing methods such as downscaling, subsampling etc. are method agnostic. They will happen no matter what method you choose.
     """
 
-    def __init__(self, method:ProcessorMethod, config:dict) -> None:
-        '''
+    def __init__(self, method: ProcessorMethod, config: dict) -> None:
+        """
         Init function. Here you set which method you want the processor to use and a corresponding config.
         Args:
             `method` (ProcessorMethod): which method do you want to use for processing videos
             `config` (dict): Config file containing parameters for the video processing
         Returns:
             None
-        '''
+        """
         # Due to some bugs with codecs, we are not able to keep the original 4k resolution
         # Therefore for downsampling this should be set to at least 2
         self.config = config
@@ -163,7 +164,9 @@ class VideoProcessor:
             start_at=self.start_at_frame,
         )
 
-        center, quality = estimate_rotation_center_for_each_trajectory(np_trajectories, 'mean')
+        center, quality = estimate_rotation_center_for_each_trajectory(
+            np_trajectories, "mean"
+        )
         logger.info("Estimated rotation center: (%s, %s)", center[0], center[1])
         logger.info("Center quality metric: %s (lower is better)", quality)
 
@@ -199,7 +202,7 @@ class VideoProcessor:
         """
         Rotation around a fixed center, under the assumption that each frame is rotated by a fixed angle.
         """
-        estimate_params = self.config.get("estimate_params")
+        estimate_params = self.config.get("approximation_params")
 
         rotation_center = estimate_params["rotation_center"]
         rotation_center = np.array((rotation_center["x"], rotation_center["y"]))
