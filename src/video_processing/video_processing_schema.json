@@ -1,70 +1,129 @@
 {
-    "type": "object",
-    "properties": {
-        "fps_out": {"type": "number"},
-        "sampling_rate": {"type": "integer"},
-        "downscale_factor": {"type": "number"},
-        "grayscale": {"type": "boolean"},
-        "start_at": {"type": "integer"},
-        "opt_flow_params": {
-                "type": "object",
-                "properties": {
-                    "f_params": {
-                        "type": "object",
-                        "properties": {
-                            "maxcorners": {"type": "integer"},
-                            "qualitylevel": {"type": "number"},
-                            "mindistance": {"type": "integer"},
-                            "blocksize": {"type": "integer"}
-                        },
-                        "required": ["maxCorners", "qualityLevel", "minDistance", "blockSize"]
-                    },
-                    "lk_params": {
-                        "type": "object",
-                        "properties": {
-                            "winsize": {
-                                "type": "array",
-                                "items": {"type": "integer"},
-                                "minitems": 2,
-                                "maxitems": 2
-                            },
-                            "maxlevel": {"type": "integer"},
-                            "criteria": {
-                                "type": "array",
-                                "items": {"type": "number"},
-                                "minitems": 3,
-                                "maxitems": 3
-                            }
-                        },
-                        "required": ["winSize", "maxLevel", "criteria"]
-                }
-            },
-            "required": ["f_params", "lk_params"]
-        }
+  "type": "object",
+  "properties": {
+    "fps_out": {
+      "type": "number",
+      "description": "What the fps of the resulting video should be."
     },
-    "approximation_params": {
-            "type": "object",
-            "rotation_center": {"type": "object",
-                              "x": {"type": "number"},
-                              "y": {"type": "number"},
-                              "required": [
-                                "x",
-                                "y"
-                              ]
-                              },
-            "rotation_per_frame": {"type": "number"},
-            "required": [
-                "center_offset",
-                "rotation_per_frame"
-            ]
+    "sampling_rate": {
+      "type": "integer",
+      "description": "The out video will take every nth frame from the source video. 1 = every frame"
+    },
+    "downscale_factor": {
+      "type": "number",
+      "description": "By how much should the video be scaled down in size."
+    },
+    "grayscale": {
+      "type": "boolean",
+      "description": "Should the resulting video be grayscale?"
+    },
+    "start_at": {
+      "type": "integer",
+      "description": "At which frame number should the resulting video start?"
+    },
+    "opt_flow_params": {
+      "type": "object",
+      "description": "Parameters for optical flow",
+      "properties": {
+        "f_params": {
+          "type": "object",
+          "properties": {
+            "maxCorners": {
+              "type": "integer",
+              "description": "Max number of corners (features) to return. Returns the strongest n corners if n <= 0."
+            },
+            "qualitylevel": {
+              "type": "number",
+              "description": "Minimum accepted quality of image corners. Value is multiplied by the best corner quality measure, everything with lover quality is rejected."
+            },
+            "mindistance": {
+              "type": "integer",
+              "description": "Minimum possible Euclidean distance between the returned corners"
+            },
+            "blocksize": {
+              "type": "integer",
+              "description": "Size of an average block for computing a derivative covariation matrix over each pixel's neighbourhood"
+            }
+          },
+          "required": [
+            "maxCorners",
+            "qualityLevel",
+            "minDistance",
+            "blockSize"
+          ]
+        },
+        "lk_params": {
+          "type": "object",
+          "description": "Parameters for Lucas-Kanade optical flow implementation in OpenCV",
+          "properties": {
+            "winsize": {
+              "type": "array",
+              "description": "Size of the search window at each pyramid level",
+              "items": {
+                "type": "integer"
+              },
+              "minitems": 2,
+              "maxitems": 2
+            },
+            "maxlevel": {
+              "type": "integer",
+              "description": "0-based maximal pyramid level. If set to 0, pyramids are not used (therefore its single level)."
+            },
+            "criteria": {
+              "type": "array",
+              "description": "Param specifying the termination criteria of the iterative search algorithm.",
+              "items": {
+                "type": "number"
+              },
+              "minitems": 3,
+              "maxitems": 3
+            }
+          },
+          "required": [
+            "winSize",
+            "maxLevel",
+            "criteria"
+          ]
+        }
+      },
+      "required": [
+        "f_params",
+        "lk_params"
+      ]
+    }
+  },
+  "approximation_params": {
+    "type": "object",
+    "description": "Parameters for the simplest approximation",
+    "rotation_center": {
+      "type": "object",
+      "description": "Rotation centre in the coordinates of the original video pa",
+      "x": {
+        "type": "number"
+      },
+      "y": {
+        "type": "number"
+      },
+      "required": [
+        "x",
+        "y"
+      ]
+    },
+    "rotation_per_frame": {
+      "type": "number"
     },
     "required": [
-        "fps_out",
-        "sampling_rate",
-        "downscale_factor",
-        "grayscale",
-        "start_at",
-        "opt_flow_params",
-        "approximation_params"
+      "center_offset",
+      "rotation_per_frame"
     ]
+  },
+  "required": [
+    "fps_out",
+    "sampling_rate",
+    "downscale_factor",
+    "grayscale",
+    "start_at",
+    "opt_flow_params",
+    "approximation_params"
+  ]
 }
