@@ -60,7 +60,7 @@
     }
   },
   // Parameters for the simplest approximation
-  approximation_params: {
+  rough_rotation_estimation: {
     // Rotation centre in the coordinates of the original video pa
     rotation_center:
     {

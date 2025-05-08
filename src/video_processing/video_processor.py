@@ -202,7 +202,7 @@ class VideoProcessor:
         """
         Rotation around a fixed center, under the assumption that each frame is rotated by a fixed angle.
         """
-        estimate_params = self.config.get("approximation_params")
+        estimate_params = self.config.get("rough_rotation_estimation")
 
         rotation_center = estimate_params["rotation_center"]
         rotation_center = np.array((rotation_center["x"], rotation_center["y"]))
@@ -228,6 +228,7 @@ class VideoProcessor:
         save_as = create_out_filename(base, [], ["transformations"])
         save_as = append_file_extension(save_as, ".csv")
 
+        # TODO: Add a description of this to README
         with open(save_as, "w", newline="") as f:
             writer = csv.writer(f)
             writer.writerow(["frame_id", "m00", "m01", "m02", "m10", "m11", "m12"])

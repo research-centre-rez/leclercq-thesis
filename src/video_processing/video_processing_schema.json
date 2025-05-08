@@ -92,7 +92,7 @@
       ]
     }
   },
-  "approximation_params": {
+  "rough_rotation_estimation": {
     "type": "object",
     "description": "Parameters for the simplest approximation",
     "rotation_center": {
@@ -124,6 +124,6 @@
     "grayscale",
     "start_at",
     "opt_flow_params",
-    "approximation_params"
+    "rough_rotation_estimation"
   ]
 }
