@@ -29,6 +29,7 @@ def parse_args():
         "-i",
         "--input",
         type=str,
+        nargs="+",
         required=True,
         help="Relative (or absolute) path to the video you want to process. Example: --i ../data/1/1-part0.mp4",
     )
@@ -92,15 +93,21 @@ def main(args):
         logger.error("Invalid configuration: \n %s", e.message)
         sys.exit(1)
 
-    if args.output in ["auto", "automatic"]:
-        base, _ = os.path.splitext(args.input)
-        save_as = create_out_filename(base, [], ["preprocessed"])
-        args.output = append_file_extension(save_as, "mp4")
-
     proc = VideoProcessor(method=ProcessorMethod[args.method.upper()], config=config)
+    for input_path in args.input:
 
-    analysis = proc.get_rotation_analysis(args.input)
-    proc.write_out_video(args.input, analysis, args.output)
+        if args.output in ["auto", "automatic"]:
+            base, _ = os.path.splitext(input_path)
+            save_as = create_out_filename(base, [], ["processed"])
+            output_path = append_file_extension(save_as, "mp4")
+        else:
+            output_path = args.output
+
+
+        logger.info("Processing %s -> %s", input_path, output_path)
+        analysis = proc.get_rotation_analysis(input_path)
+        proc.write_out_video(input_path, analysis, output_path)
+        logger.info("==================================================")
 
 
 if __name__ == "__main__":

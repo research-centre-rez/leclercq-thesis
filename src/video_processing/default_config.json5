@@ -20,26 +20,26 @@
     The value refers to the number of the frame
       Example:
       start_at = 15, the output video will start at frame 15 of the original video */
-  start_at: 15,
+  start_at: 30,
   // Parameters for performing optical flow processing
   opt_flow_params: {
     // Parameters for cv.goodFeaturesToTrack()
     f_params: {
       /* 
         Max number of corners(features) to return, returns the strongest n corners
-        maxCorners <= 0 means no limit on the maximum number of corners */
-      maxCorners: 30, 
+        maxCorners = 0 means no limit on the maximum number of corners */
+      maxCorners: 200, 
       /*
         Parameter deciding the min accepted quality of img corners. Value is multiplied by the best corner quality measure.
         Corners with the quality measure less than the product are rejected
         Example:
           Best corner has quality measure = 1500 and the qualityLevel=0.01 
           Then all corners with the quality measure less than 15 are thrown away */
-      qualityLevel: 0.002,
+      qualityLevel: 0.001,
       // Min possible Euclidean distance betwen the returned corners
-      minDistance: 5,
+      minDistance: 2,
       // Size of an average block for computing a derivative covariation matrix over each pixel neighbourhood
-      blockSize: 7
+      blockSize: 15
     },
     // Parameters for Lucas-Kanade optical flow implementation in OpenCV
     lk_params: {
@@ -48,7 +48,7 @@
       /*
         0-based maximal pyramid level. If set to 0, pyramids are not used (therefore its single level).
         If set to 1, then two pyramids are used, and so on */
-      maxLevel: 3,
+      maxLevel: 4,
       /*
         Param specifying the termination criteria of the iterative search algorithm.
         Alternatively when the search window moves by less that criteria.epsilon
@@ -56,7 +56,7 @@
           type: type of termination criteria. 3 => the desired accuracy or change in params at which the iterative algorithm stops
           maxCount: The maximum number of iterations per point that's being tracked
           epsilon: The desired accuracy or change in params at which the iterative algorithm stops */
-      criteria: [3, 15, 0.01]
+      criteria: [3, 50, 0.01]
     }
   },
   // Parameters for the simplest approximation

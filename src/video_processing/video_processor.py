@@ -96,6 +96,9 @@ class VideoProcessor:
             len(analysis["angles"]) == total_frame_count
         ), "Length of angles is not the same as video length"
 
+        path, _ = os.path.split(save_as)
+        os.makedirs(path, exist_ok=True)
+
         # Information about dimensions
         capture_width = int(src_capture.get(cv.CAP_PROP_FRAME_WIDTH))
         capture_height = int(src_capture.get(cv.CAP_PROP_FRAME_HEIGHT))
@@ -110,6 +113,7 @@ class VideoProcessor:
 
         # Write out the processed video
         transformations = []
+        var = np.var(analysis["angles"])
         with tqdm(desc="Correcting rotation", total=total_frame_count) as pbar:
             i = 0
             while True:
@@ -165,17 +169,19 @@ class VideoProcessor:
         )
 
         center, quality = estimate_rotation_center_for_each_trajectory(
-            np_trajectories, "mean"
+            np_trajectories, "median"
         )
         logger.info("Estimated rotation center: (%s, %s)", center[0], center[1])
         logger.info("Center quality metric: %s (lower is better)", quality)
 
         rotation_res = calculate_angular_movement(np_trajectories, center)
 
-        base, _ = os.path.splitext(video_path)
+        _, name = os.path.split(video_path)
+        base, _ = os.path.splitext(name)
 
         graph_config = {
-            "save_as": create_out_filename(base, [], ["optical", "flow", "analysis"]),
+            "save_as": create_out_filename(f'./_images/{base}', [], ["optical", "flow", "analysis"]),
+            "sample_name": name,
             "save": True,
             "show": False,
         }
@@ -183,7 +189,7 @@ class VideoProcessor:
         utils.visualisers.visualize_rotation_analysis(
             np_trajectories, rotation_res, graph_config=graph_config
         )
-        angles = rotation_res["average_angle_per_frame_deg"]
+        angles = rotation_res["median_angle_per_frame_deg"]
 
         return center, angles
 

@@ -120,27 +120,34 @@ def calculate_angular_movement(trajectories, center):
 
     avg_angle_per_frame = [0.0]
     var_angle_per_frame = [0.0]
+    med_angle_per_frame = [0.0]
 
     for angles in frame_angles:
         if angles:
             avg_angle = np.mean(angles)
             var_angle = np.var(angles)
+            med_angle = np.median(angles)
         else:
             avg_angle = np.nan
             var_angle = np.nan
+            med_angle = np.nan
 
         avg_angle_per_frame.append(avg_angle)
         var_angle_per_frame.append(var_angle)
+        med_angle_per_frame.append(med_angle)
 
-    cum_angles = np.nancumsum(avg_angle_per_frame)
+
+    cum_angles = np.nancumsum(med_angle_per_frame)
 
     avg_angle_per_frame_deg = [angle * 180 / np.pi for angle in avg_angle_per_frame]
+    med_angle_per_frame_deg = [angle * 180 / np.pi for angle in med_angle_per_frame] 
     cum_angles_deg = cum_angles * 180 / np.pi
 
     # These results are later used for drawing graphs
     results = {
         "center": (center_x, center_y),
         "average_angle_per_frame_deg": avg_angle_per_frame_deg,
+        "median_angle_per_frame_deg": med_angle_per_frame_deg,
         "variance_angle_per_frame": var_angle_per_frame,
         "cumulative_angles_deg": cum_angles_deg,
         "mean_angular_velocity_deg_per_frame": np.nanmean(avg_angle_per_frame_deg),
