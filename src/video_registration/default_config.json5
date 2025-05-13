@@ -15,6 +15,7 @@
     // How often the reference image should be updated
     ref_range:10
   },
+  // Configuration for LightGlue registration
   lightGlue:{
     /*
       Which extractor do you want to use. The options are the following:
@@ -27,7 +28,7 @@
     /*
       Maximum number of keypoints the extractor should find.
       Setting the parameter to null will result in the extractor returning ALL keypoints */
-    max_num_keypoints:null,
+    max_num_keypoints:1500,
     // Parameters for LightGlue
     matcher:{
       // Number of stacked self+cross attention layers. Reduce for faster inference at cost of accuracy
@@ -41,7 +42,7 @@
       depth_confidence:0.95,
       // Controls the iterative point pruning. Lower value prunes more points earlier
       // Disable with -1
-      width_confidence:0.99,
+      width_confidence:-1,
       // Match confidence, Increase this value to obtain less, but stronger matches
       filter_threshold:0.1
     },

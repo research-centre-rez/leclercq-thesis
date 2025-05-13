@@ -91,8 +91,9 @@ def main(args):
 
     reg = VideoRegistrator(method=args.method, config=config)
 
-    registered_stack = reg.get_registered_block(args.input)
-    reg.save_registered_block(registered_stack, args.output)
+    reg_analysis = reg.get_registered_block(args.input)
+
+    reg.save_registered_block(reg_analysis, args.output)
 
 
 if __name__ == "__main__":
