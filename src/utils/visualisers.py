@@ -235,6 +235,7 @@ def visualize_rotation_analysis(trajectories, rotation_results, frames=None, gra
 
     # Plot 1: Trajectories and rotation center
     fig = plt.figure(figsize=(16,10))
+    fig.suptitle(f"Optical flow analysis for {graph_config['sample_name']}")
 
     ax1 = fig.add_subplot(221)
     # Plot trajectories
@@ -256,6 +257,7 @@ def visualize_rotation_analysis(trajectories, rotation_results, frames=None, gra
 
     # Get angle data
     angles_deg = rotation_results["average_angle_per_frame_deg"]
+    med_angle_deg = rotation_results["median_angle_per_frame_deg"]
     angles_var = rotation_results["variance_angle_per_frame"]
     frames_idx = range(len(angles_deg))
 
@@ -286,6 +288,29 @@ def visualize_rotation_analysis(trajectories, rotation_results, frames=None, gra
     ax3.set_ylabel('Cumulative Rotation (degrees)')
     ax3.set_title("Cumulative Rotation")
 
+    # Plot 4: Median rotation per frame
+    ax4 = fig.add_subplot(224)
+
+    # Get angle data
+    med_angle_deg = rotation_results["median_angle_per_frame_deg"]
+    angles_var = rotation_results["variance_angle_per_frame"]
+    frames_idx = range(len(angles_deg))
+
+    std_dev = np.sqrt(angles_var)
+
+    ax4.plot(frames_idx, med_angle_deg, 'g-', label='Median angle per frame')
+    ax4.axhline(y=rotation_results["mean_angular_velocity_deg_per_frame"],
+              color='r', linestyle='--',
+              label=f'Mean: {rotation_results["mean_angular_velocity_deg_per_frame"]:.5f}° / frame')
+
+    ax4.axhline(y=rotation_results["median_angular_velocity_deg_per_frame"],
+             color='g', linestyle='--',
+              label=f'Median: {rotation_results["median_angular_velocity_deg_per_frame"]:.5f}° / frame')
+    ax4.set_xlabel('Frame')
+    ax4.set_ylabel('Median Angular Movement (degrees)')
+    ax4.set_title("Angular Velocity")
+    ax4.legend()
+
     if graph_config['save']:
         plt.savefig(graph_config['save_as'], dpi=600)
 
@@ -293,6 +318,7 @@ def visualize_rotation_analysis(trajectories, rotation_results, frames=None, gra
         plt.close()
     else:
         plt.show()
+
 
     # Get angle data
 #    angles_deg = rotation_results["average_angle_per_frame_deg"]

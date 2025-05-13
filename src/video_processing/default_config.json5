@@ -1,0 +1,72 @@
+// Parameter descriptions are taken from OpenCV's documentation
+// source for goodFeatureToTrack(): https://docs.opencv.org/3.4/dd/d1a/group__imgproc__feature.html#ga1d6bb77486c8f92d79c8793ad995d541
+// source for LK optical flow: https://docs.opencv.org/3.4/dc/d6b/group__video__track.html#ga473e4b886d0bcc6b65831eb88ed93323
+{
+  // Set the fps of the out video
+  fps_out: 25.0,
+  // The out video will take every nth frame from the source video. 1 = every frame
+  sampling_rate: 4,
+  /*
+    By how much should the video be scaled down in size
+    NOTE:
+      If the source video is in 4k, then for some mystical reasons opencv is not able to write out a 4k video
+      I have spent quite some long time on figuring out why and I haven't been able to figure it out 
+      The resulting video is a valid .mp4 video but it will literally crash my computer*/
+  downscale_factor: 2,
+  // Turn the resulting video into grayscale
+  grayscale: true,
+  /*
+    At which frame do you want to start the video? Used for skipping parts with image whitening noise
+    The value refers to the number of the frame
+      Example:
+      start_at = 15, the output video will start at frame 15 of the original video */
+  start_at: 30,
+  // Parameters for performing optical flow processing
+  opt_flow_params: {
+    // Parameters for cv.goodFeaturesToTrack()
+    f_params: {
+      /* 
+        Max number of corners(features) to return, returns the strongest n corners
+        maxCorners = 0 means no limit on the maximum number of corners */
+      maxCorners: 200, 
+      /*
+        Parameter deciding the min accepted quality of img corners. Value is multiplied by the best corner quality measure.
+        Corners with the quality measure less than the product are rejected
+        Example:
+          Best corner has quality measure = 1500 and the qualityLevel=0.01 
+          Then all corners with the quality measure less than 15 are thrown away */
+      qualityLevel: 0.001,
+      // Min possible Euclidean distance betwen the returned corners
+      minDistance: 2,
+      // Size of an average block for computing a derivative covariation matrix over each pixel neighbourhood
+      blockSize: 15
+    },
+    // Parameters for Lucas-Kanade optical flow implementation in OpenCV
+    lk_params: {
+      // Size of the search window at each pyramid level
+      winSize: [30, 30],
+      /*
+        0-based maximal pyramid level. If set to 0, pyramids are not used (therefore its single level).
+        If set to 1, then two pyramids are used, and so on */
+      maxLevel: 4,
+      /*
+        Param specifying the termination criteria of the iterative search algorithm.
+        Alternatively when the search window moves by less that criteria.epsilon
+        criteria: [type, maxCount, epsilon] where:
+          type: type of termination criteria. 3 => the desired accuracy or change in params at which the iterative algorithm stops
+          maxCount: The maximum number of iterations per point that's being tracked
+          epsilon: The desired accuracy or change in params at which the iterative algorithm stops */
+      criteria: [3, 50, 0.01]
+    }
+  },
+  // Parameters for the simplest approximation
+  rough_rotation_estimation: {
+    // Rotation centre in the coordinates of the original video pa
+    rotation_center:
+    {
+      x: 2202.6921, // along width
+      y: 1081.7988  // along height
+    },
+    rotation_per_frame: 0.14798
+  }
+}
