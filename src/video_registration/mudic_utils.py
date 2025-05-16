@@ -106,11 +106,12 @@ def correlate_matrix(
     # j = number of grids in vertical direction
     # n = number of images (=length of vid_mat)
     disp = fields.disp()
-
+    
     # If the correlation fails, muDIC still returns incomplete displacement and doesn't
     # say whether there was an error or not
     if disp.shape[-1] != len(image_stack):
         logger.error("muDIC correlation failed to run on the whole image_stack")
+        raise ValueError("MUDIC DID NOT RUN PROPERLY")
 
     return disp
 

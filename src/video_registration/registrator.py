@@ -1,13 +1,16 @@
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from enum import Enum
 import time
 import logging
 import os
 import sys
 import csv
+from typing import Callable
 import numpy as np
 import cv2 as cv
+from cv2 import ORB
 import muDIC as dic
+from LightGlue.lightglue.utils import Extractor
 from lightglue import LightGlue, SuperPoint, DISK, SIFT, ALIKED, DoGHardNet
 from lightglue.utils import load_image, rbd, numpy_image_to_torch
 import torch
@@ -35,16 +38,27 @@ class RegMethod(Enum):
 
 
 class VideoRegistrator:
+    """
+    Video registration class. All of the configuration for this class can be found in `./default_config.json5`.
+    There are 3 main ways of performing registration:
+        1. ORB: A feature-based method that utilises ORB for registering a video.
+        2. MUDIC: An area-based method using a digital image correlation library called muDIC.
+        3. LIGHTGLUE: A deep-learning based method.
+    """
+
     def __init__(self, method: RegMethod, config: dict) -> None:
+        """
+        Init method for video registration.
+        Args:
+            method (RegMethod): Tells the class which method you want to use for performing video registration
+            config (dict): A validated configuration dictionary that specifies parameters for each method
+        Returns:
+            None
+        """
 
         self.config = config
 
-        self.vid_in = None
-        self.vid_out = None
-        self.cap_in = None
-
-        self.frame_h = None
-        self.frame_w = None
+        self.method: Callable[[str], tuple[np.ndarray, np.ndarray]]
 
         if method == RegMethod.ORB:
             self.method = self._get_orb_registration
@@ -55,35 +69,134 @@ class VideoRegistrator:
         elif method == RegMethod.LIGHTGLUE:
             self.method = self._get_lightglue_registration
 
-    def save_registered_block(self, reg_analysis: dict, save_as: str) -> None:
+    def set_method(self, new_method: RegMethod) -> None:
+        """
+        Changes the internal method of the registrator to `new_method`
+        """
+        if new_method == RegMethod.ORB:
+            self.method = self._get_orb_registration
+
+        elif new_method == RegMethod.MUDIC:
+            self.method = self._get_mudic_registration
+
+        elif new_method == RegMethod.LIGHTGLUE:
+            self.method = self._get_lightglue_registration
+
+    def save_registered_block(
+        self, reg_analysis: dict[str, np.ndarray], save_as: str
+    ) -> None:
         """
         Write the registered block and the transformations to memory.
         """
-
         np.save(save_as, reg_analysis["registered_block"])
-        # self._write_transformation_into_csv(reg_analysis["transformations"], save_as)
+        self._write_transformation_into_csv(reg_analysis["transformations"], save_as)
 
-    def get_registered_block(self, video_input_path: str) -> dict:
+    def get_registered_block(self, video_input_path: str) -> dict[str, np.ndarray]:
         """
-        Performs video registration based on the user's specified method.
+        Performs video registration based on the method that was chosen at the initialisation.
 
         Args:
             video_input_path (str): path to the video you want to register
 
         Returns:
             dictionary that contains two fields:
-                "registered_block": registered block
-                "transformations": transformations that were performed at each step
+                "registered_block" (np.ndarray): registered video stack
+                "transformations" (np.ndarray): transformations that were performed at each step
         """
         reg_block, transformations = self.method(video_input_path)
         result = {"registered_block": reg_block, "transformations": transformations}
         return result
 
+    def _get_orb_registration(self, input_video: str) -> tuple[np.ndarray, np.ndarray]:
+        """
+        Performs orb registration with moving the fixed image every few frames.
+        """
+        _orb_config = self.config.get("ORB_parameters")
+        _homography_config = self.config.get("lightGlue")["homography"]
+        _matcher_config = _orb_config["matcher"]
+        _update_every_nth_frame = _orb_config["update_every_frame"]
+
+        _homography_config["method"] = getattr(cv, _homography_config["method"])
+        _matcher_config["normType"] = getattr(cv, _matcher_config["normType"])
+
+        input_cap = prep_cap(input_video, set_to=0)
+        frame_w = int(input_cap.get(cv.CAP_PROP_FRAME_WIDTH))
+        frame_h = int(input_cap.get(cv.CAP_PROP_FRAME_HEIGHT))
+        total_frames = int(input_cap.get(cv.CAP_PROP_FRAME_COUNT))
+
+        registered_frames = []
+        transformations = []
+
+        orb = ORB.create(**_orb_config["init_params"])
+        matcher = cv.BFMatcher.create(**_matcher_config)
+
+        ret, fixed_frame = input_cap.read()
+        if not ret:
+            raise ValueError("Couldn't load a frame from the video")
+
+        fixed_frame = cv.cvtColor(fixed_frame, cv.COLOR_BGR2GRAY)
+        registered_frames.append(fixed_frame)
+        transformations.append(np.eye(3))
+
+        fixed_kp, fixed_des = orb.detectAndCompute(fixed_frame, None)
+
+        with tqdm(total=total_frames - 1, desc="Registering with ORB") as pbar:
+            i = 0
+            while True:
+                ret, moving_frame = input_cap.read()
+                if not ret:
+                    break
+
+                moving_frame = cv.cvtColor(moving_frame, cv.COLOR_BGR2GRAY)
+                moving_kp, moving_des = orb.detectAndCompute(moving_frame, None)
+
+                matches = matcher.match(moving_des, fixed_des)
+                dist_matches = np.array([m.distance for m in matches])
+
+                # Filter out matches that are too far
+                mask = dist_matches <= _orb_config["max_match_distance"]
+                indices = np.nonzero(mask)[0]
+
+                pbar.set_postfix(
+                    num_matches=f"{len(matches)}", good_matches=f"{len(indices)}"
+                )
+
+                matches = [matches[i] for i in indices]
+
+                fixed_pts = np.float32(
+                    [fixed_kp[m.trainIdx].pt for m in matches]
+                ).reshape(-1, 1, 2)
+
+                moving_pts = np.float32(
+                    [moving_kp[m.queryIdx].pt for m in matches]
+                ).reshape(-1, 1, 2)
+
+                H, _ = cv.findHomography(moving_pts, fixed_pts, **_homography_config)
+
+                transformations.append(H)
+
+                reg_frame = cv.warpPerspective(moving_frame, H, (frame_w, frame_h))
+
+                # Change the fixed frame
+                if i % _update_every_nth_frame == 0:
+                    fixed_frame = reg_frame
+                    fixed_kp, fixed_des = orb.detectAndCompute(fixed_frame, None)
+
+                registered_frames.append(reg_frame)
+                pbar.update(1)
+                i += 1
+
+        input_cap.release()
+        registered_frames = np.array(registered_frames)
+        transformations = np.array(transformations)
+
+        return registered_frames, transformations
+
     def _get_lightglue_registration(
         self, input_video: str
-    ) -> tuple[np.ndarray, list[np.ndarray]]:
+    ) -> tuple[np.ndarray, np.ndarray]:
         """
-        Performs LightGlue registration
+        Performs LightGlue registration.
         """
         _lglue_config = self.config.get("lightGlue")
         _hom_config = _lglue_config["homography"]
@@ -91,6 +204,7 @@ class VideoRegistrator:
         extractor = _lglue_config["extractor"]
         max_num_kp = _lglue_config["max_num_keypoints"]
 
+        logger.info("Initialising the extractor and matcher")
         extractor, matcher = self._get_extractor_matcher(
             extractor_name=extractor, matcher_config=_matcher, max_num_kp=max_num_kp
         )
@@ -98,88 +212,41 @@ class VideoRegistrator:
         # Parsing the human-readable string into an opencv enum
         _hom_config["method"] = getattr(cv, _hom_config["method"])
 
-        # First image in the sequence has no transformation
-        transformations = [(0, np.eye(3, 3))]
-
+        # Parse the video in a matrix
         vid_stack = create_video_matrix(input_video, grayscale=True)
 
-        logger.info("Initialising the extractor and matcher")
+        # First image in the sequence has no transformation
+        transformations = np.zeros((len(vid_stack), 3, 3))
+        transformations[0] = np.eye(3, 3)
 
-        fixed_np = vid_stack[0]
+        # The original dimensions of the images
+        out_res = (vid_stack[0].shape[1], vid_stack[0].shape[0])
 
         fixed_image = numpy_image_to_torch(
-            cv.cvtColor(fixed_np, cv.COLOR_GRAY2RGB)
+            cv.cvtColor(vid_stack[0], cv.COLOR_GRAY2RGB)
         ).cuda()
         fixed_feats = extractor.extract(fixed_image)
 
-        N = 4
+        batch_size = _lglue_config["batch_size"]
+
+        # Copy over the fixed features for performing parallel kp extraction
         f_kp = fixed_feats["keypoints"]
         f_dp = fixed_feats["descriptors"]
         im_size = fixed_feats["image_size"]
-
-        f_kp = f_kp.repeat((N, 1, 1))
-        f_dp = f_dp.repeat((N, 1, 1))
-        im_size = im_size.repeat((N, 1))
-
+        f_kp = f_kp.repeat((batch_size, 1, 1))
+        f_dp = f_dp.repeat((batch_size, 1, 1))
+        im_size = im_size.repeat((batch_size, 1))
         fixed_feats = {"keypoints": f_kp, "descriptors": f_dp, "image_size": im_size}
 
-        out_res = (fixed_np.shape[1], fixed_np.shape[0])
-
         futures = []
-        with torch.no_grad(), ProcessPoolExecutor(max_workers=16) as executor:
-            for i in tqdm(
-                range(1, len(vid_stack[1:]), N),
-                desc="Glueing",
-            ):
-                moving_images = []
-                for j in range(N):
-                    try:
-                        moving_images.append(
-                            numpy_image_to_torch(
-                                cv.cvtColor(vid_stack[j + i], cv.COLOR_GRAY2RGB)
-                            ).cuda()
-                        )
-                    except IndexError as e:
-                        moving_images.append(moving_images[0].cuda())
 
-                moving_images = torch.stack(moving_images).cuda()
-                moving_feats = extractor.extract(moving_images)
-
-                # This is staying here until I am sure I can safely delete it away
-                # batched_kp = []
-                # batched_dp = []
-                # batched_imsize = []
-                # max_kp = 0
-                # for j in range(N):
-                #     try:
-                #         moving_image = numpy_image_to_torch(
-                #             cv.cvtColor(vid_stack[j + i], cv.COLOR_GRAY2RGB)
-                #         ).cuda()
-                #     except IndexError as e:
-                #         moving_image = torch.zeros_like(fixed_image).cuda()
-                #     moving_feats = extractor.extract(moving_image)
-                #     v_kp = moving_feats["keypoints"]
-                #     v_dp = moving_feats["descriptors"]
-                #     im_size = moving_feats["image_size"]
-                #     max_kp = max(max_kp, v_kp.shape[1])
-                #     batched_kp.append(v_kp)
-                #     batched_dp.append(v_dp)
-                #     batched_imsize.append(im_size)
-
-                # padded_kp = [
-                #     F.pad(kp, (0, 0, 0, max_kp - kp.shape[1])) for kp in batched_kp
-                # ]
-                # padded_dp = [
-                #     F.pad(kp, (0, 0, 0, max_kp - kp.shape[1])) for kp in batched_dp
-                # ]
-                # stacked_kp = torch.cat(padded_kp)
-                # stacked_dp = torch.cat(padded_dp)
-
-                # moving_feats = {
-                #     "keypoints": stacked_kp,
-                #     "descriptors": stacked_dp,
-                #     "image_size": torch.cat(batched_imsize),
-                # }
+        with torch.no_grad(), ProcessPoolExecutor(max_workers=None) as executor, tqdm(
+            total=len(vid_stack[1:]), desc="Glueing"
+        ) as pbar:
+            for i in range(1, len(vid_stack[1:]), batch_size):
+                moving_feats = self._create_extracted_batch(
+                    vid_stack, i, extractor, batch_size
+                )
                 matches = matcher({"image0": fixed_feats, "image1": moving_feats})
 
                 cpu_fixed_kps = fixed_feats["keypoints"].cpu().numpy()
@@ -199,70 +266,22 @@ class VideoRegistrator:
                                 idx + i,
                             )
                         )
+                        pbar.update(1)
                     else:
                         break
 
-        for future in futures:
-            result = future.result()
-            if result is not None:
-                frame_idx, H, warped = result
-                transformations.append((frame_idx, H))
-                vid_stack[frame_idx] = warped
+            for future in as_completed(futures):
+                result = future.result()
+                if result is not None:
+                    frame_idx, H, warped = result
+                    transformations[frame_idx] = H
+                    vid_stack[frame_idx] = warped
 
         return vid_stack, transformations
 
-    #                for idx, match in enumerate(matches["matches"]):
-    #                    if len(match) > 4:
-    #                        points_fixed = fixed_feats["keypoints"][idx][match[...,0]]
-    #                        points_moved = moving_feats["keypoints"][idx][match[...,1]]
-    #                        H, _ = cv.findHomography(
-    #                            points_moved.cpu().numpy(),
-    #                            points_fixed.cpu().numpy(),
-    #                            **_hom_config
-    #                        )
-    #
-    #                        transformations.append(H)
-    #                        moving_warp = cv.warpPerspective(
-    #                            vid_stack[i+idx], H, (fixed_np.shape[1], fixed_np.shape[0])
-    #                        )
-    #
-    #                        vid_stack[i+idx] = moving_warp
-    #
-    #            return vid_stack, transformations
-
-    #                moving_image = numpy_image_to_torch(
-    #                    cv.cvtColor(moving, cv.COLOR_GRAY2RGB)
-    #                ).cuda()
-    #                moving_feats = extractor.extract(moving_image)
-    #
-    #                # Removing batch dimension
-    #                f_fixed, f_moved, matches01 = [
-    #                    rbd(x) for x in [fixed_feats, moving_feats, matches]
-    #                ]
-    #
-    #                matches = matches01["matches"]  # indices with shape (K,2)
-    #                points_fixed = f_fixed["keypoints"][matches[..., 0]]
-    #                points_moved = f_moved["keypoints"][matches[..., 1]]
-    #
-    #                H, _ = cv.findHomography(
-    #                    points_moved.cpu().numpy(),
-    #                    points_fixed.cpu().numpy(),
-    #                    **_hom_config
-    #                )
-    #
-    #                transformations.append(H)
-    #                moving_warp = cv.warpPerspective(
-    #                    moving, H, (fixed_np.shape[1], fixed_np.shape[0])
-    #                )
-    #
-    #                vid_stack[i] = moving_warp
-    #
-    #            logger.info("Video succesfully registered.")
-    #            return vid_stack, transformations
-
     def _get_mudic_registration(
-        self, input_video
-    ) -> tuple[np.ndarray, list[np.ndarray]]:
+        self, input_video: str
+    ) -> tuple[np.ndarray, np.ndarray]:
         """
         Performs video registration with the use of muDIC.
         """
@@ -284,15 +303,14 @@ class VideoRegistrator:
         displacement = displacement.squeeze()
         meds = extract_medians(displacement)
 
-        logger.info("mudic finished succesfully")
         return self._shift_by_vector(vid_stack, meds)
-
-    def _get_ORB_registration(self, input_video) -> tuple[np.ndarray, list[np.ndarray]]:
-        return None
 
     def _shift_by_vector(
         self, image_stack, displacement
-    ) -> tuple[np.ndarray, list[np.ndarray]]:
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """
+        Performs the registration for muDIC.
+        """
         n, h, w = image_stack.shape
 
         x_c, y_c = self._fit_ellipse(displacement)
@@ -303,14 +321,14 @@ class VideoRegistrator:
             x_d, y_d = displacement[i]
 
             T = np.array([[1, 0, -x_d + x_c], [0, 1, -y_d + y_c]])
-            transformations.append(T)
+            transformations.append(np.vstack([T, [0, 0, 1]]))
 
             im_translated = cv.warpAffine(image, T, (w, h))
             image_stack[i] = im_translated
 
-        return image_stack, transformations
+        return image_stack, np.array(transformations)
 
-    def _fit_ellipse(self, disp: np.ndarray):
+    def _fit_ellipse(self, disp: np.ndarray) -> tuple:
         model = EllipseModel()
         success = model.estimate(disp)
 
@@ -322,7 +340,12 @@ class VideoRegistrator:
 
         return xc, yc
 
-    def _write_transformation_into_csv(self, trans: list[np.ndarray], save_as: str):
+    def _write_transformation_into_csv(
+        self, trans: list[np.ndarray], save_as: str
+    ) -> None:
+        """
+        Writes the homogenenous transformations into the specified csv file.
+        """
         base, _ = os.path.splitext(save_as)
 
         save_as = create_out_filename(base, [], ["transformations"])
@@ -336,9 +359,55 @@ class VideoRegistrator:
 
         logger.info("Stored csv data about transformation in %s", save_as)
 
+    def _create_extracted_batch(
+        self, vid_stack, video_index, extractor, batch_size
+    ) -> dict[str, torch.Tensor]:
+        """
+        Creates a batch that can be then passed into LightGlue
+        """
+        batched_kp = []
+        batched_dp = []
+        batched_imsize = []
+        max_kp = 0
+        for j in range(batch_size):
+            try:
+                moving_image = numpy_image_to_torch(
+                    cv.cvtColor(vid_stack[j + video_index], cv.COLOR_GRAY2RGB)
+                ).cuda()
+            except IndexError as e:
+                # Padding with empty image
+                moving_image = numpy_image_to_torch(
+                    cv.cvtColor(np.zeros_like(vid_stack[0]), cv.COLOR_GRAY2RGB)
+                ).cuda()
+
+            moving_feats = extractor.extract(moving_image)
+            v_kp = moving_feats["keypoints"]
+            v_dp = moving_feats["descriptors"]
+            im_size = moving_feats["image_size"]
+            max_kp = max(max_kp, v_kp.shape[1])
+            batched_kp.append(v_kp)
+            batched_dp.append(v_dp)
+            batched_imsize.append(im_size)
+
+        # Pad the keypoints and descriptors for pytorch
+        padded_kp = [F.pad(kp, (0, 0, 0, max_kp - kp.shape[1])) for kp in batched_kp]
+        padded_dp = [F.pad(kp, (0, 0, 0, max_kp - kp.shape[1])) for kp in batched_dp]
+        stacked_kp = torch.cat(padded_kp)
+        stacked_dp = torch.cat(padded_dp)
+
+        moving_feats = {
+            "keypoints": stacked_kp,
+            "descriptors": stacked_dp,
+            "image_size": torch.cat(batched_imsize),
+        }
+        return moving_feats
+
     def _get_extractor_matcher(
-        self, extractor_name: str, matcher_config: dict, max_num_kp
-    ):
+        self, extractor_name: str, matcher_config: dict, max_num_kp: int
+    ) -> tuple[Extractor, LightGlue]:
+        """
+        Gets the correct extractor and matcher.
+        """
         if extractor_name == "SuperPoint":
             extractor = SuperPoint(max_num_keypoints=max_num_kp).eval().cuda()
             matcher = LightGlue(features="superpoint", **matcher_config).eval().cuda()

@@ -11,9 +11,9 @@
       num_elems_y:6
     },
     // Maximum number of iterations before the DIC algorithm gives up
-    max_it:75,
+    max_it:150,
     // How often the reference image should be updated
-    ref_range:10
+    ref_range:5
   },
   // Configuration for LightGlue registration
   lightGlue:{
@@ -25,10 +25,11 @@
         SIFT: https://www.cs.ubc.ca/~lowe/papers/ijcv04.pdf
         DoGHardNet: https://github.com/DagnyT/hardnet */
     extractor:'SuperPoint',
+    batch_size:15,
     /*
       Maximum number of keypoints the extractor should find.
       Setting the parameter to null will result in the extractor returning ALL keypoints */
-    max_num_keypoints:1500,
+    max_num_keypoints:2000,
     // Parameters for LightGlue
     matcher:{
       // Number of stacked self+cross attention layers. Reduce for faster inference at cost of accuracy
@@ -63,5 +64,33 @@
       // Maximum number of RANSAC iterations
       maxIters:10000,
     }
+  },
+  ORB_parameters:{
+    init_params:{
+      // Maximum number of features to retain
+      nfeatures: 4000,
+      // Pyramid decimation ratio, greater than 1. scaleFactor==2 means that each next level will have 4x less pixels than the previous.
+      scaleFactor: 1.2,
+      // The number of pyramid levels. The smallest level will have linear size equal to input_image_size/pow(scaleFactor, nlevels - firstLevel)
+      nlevels: 3,
+      // Size of the border where the features are not detected. Should roughly match the patchSize parameter
+      edgeThreshold: 31,
+      // The level of pyramid to put source image to. Previous layers are filled with upscaled src image
+      firstLevel:0,
+      // The number of points that produce each element of the oriented BRIEF descriptor. The default value 2 means the BRIEF where we take a random point pair and compare their brightnesses, so we get 0/1 response. Other possible values are 3 and 4. For example, 3 means that we take 3 random points (of course, those point coordinates are random, but they are generated from the pre-defined seed, so each element of BRIEF descriptor is computed deterministically from the pixel rectangle), find point of maximum brightness and output index of the winner (0, 1 or 2). Such output will occupy 2 bits, and therefore it will need a special variant of Hamming distance, denoted as NORM_HAMMING2 (2 bits per bin). When WTA_K=4, we take 4 random points to compute each bin (that will also occupy 2 bits with possible values 0, 1, 2 or 3).
+      WTA_K:4,
+      // The default HARRIS_SCORE(0) means that Harris algorithm is used to rank features (the score is written to KeyPoint::score and is used to retain best nfeatures features); FAST_SCORE(1) is alternative value of the parameter that produces slightly less stable keypoints, but it is a little faster to compute. 
+      scoreType:0,
+      // The size of the patch used by the oriented BRIEF descriptor. Of course, on smaller pyramid levels the perceived image area covered by a features will be larger
+      patchSize:31,
+      // The fast threshold
+      fastThreshold:20
+    },
+    update_every_frame:2,
+    max_match_distance:5,
+    matcher: {
+      normType:"NORM_HAMMING2",
+      crossCheck:true,
+    },
   }
 }
