@@ -86,10 +86,32 @@
       // The fast threshold
       fastThreshold:20
     },
+    // These are the parameters for estimating homography between 2 sets of keypoints.
+    homography:{
+      /*
+        Which method is used for computing a homography matrix. The following are possible:
+          RANSAC - RANSAC-based robust method
+          LMEDS  - Least-Median robust method
+          RHO    - PROSAC-based robust method */
+      method:"RANSAC",
+      /*
+        Maximum allowed reprojection error to treat a point pair as an inlier (used ONLY in the RANSAC and RHO methods).
+        Since the points are measured in pixels, the documentation recommends to set the parameter in range 1 to 10 */
+      ransacReprojThreshold:8.0,
+      // Confidence level, between 0 and 1
+      confidence:0.9999,
+      // Maximum number of RANSAC iterations
+      maxIters:10000,
+    },
+    // How often the reference image should be updated
     update_every_frame:2,
+    // Maximum distance allowed between matches
     max_match_distance:5,
+    // Parameters for the matcher
     matcher: {
+      // Which norm is being used, NORM_HAMMING when WTA_K = 2, NORM_HAMMING when WTA_K >= 3
       normType:"NORM_HAMMING2",
+      // If it is false, this is will be default BFMatcher behaviour when it finds the k nearest neighbors for each query descriptor. If crossCheck==true, then the knnMatch() method with k=1 will only return pairs (i,j) such that for i-th query descriptor the j-th descriptor in the matcher's collection is the nearest and vice versa, i.e. the BFMatcher will only return consistent pairs. Such technique usually produces best results with minimal number of outliers when there are enough matches. This is alternative to the ratio test, used by D. Lowe in SIFT paper.
       crossCheck:true,
     },
   }
