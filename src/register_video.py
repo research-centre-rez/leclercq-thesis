@@ -1,6 +1,7 @@
 import os
 import json
 import json5
+import jsonschema
 import argparse
 import logging
 
@@ -80,8 +81,15 @@ def main(args):
     logger = logging.getLogger(__name__)
     pprint.pprint_argparse(args, logger)
 
-    config = load_config(args.config)
-    pprint.pprint_dict(config, "Config parameters", logger)
+    CONFIG_SCHEMA = load_json_schema("./video_registration/video_registration_schema.json")
+    try:
+        config = load_config(args.config)
+        jsonschema.validate(instance=config, schema=CONFIG_SCHEMA)
+        logger.info("Successfully validated the submitted config")
+        pprint.pprint_dict(config, "Config parameters", logger)
+    except jsonschema.ValidationError as e:
+        logger.error("Invalid configuration: \n %s", e.message)
+        sys.exit(1)
 
     if args.output == "auto" or args.output == "automatic":
         base, _ = os.path.splitext(args.input)
