@@ -112,12 +112,13 @@ class VideoRegistrator:
         Performs orb registration with moving the fixed image every few frames.
         """
         _orb_config = self.config.get("ORB_parameters")
-        _homography_config = self.config.get("lightGlue")["homography"]
+        _homography_config = _orb_config["homography"]
         _matcher_config = _orb_config["matcher"]
         _update_every_nth_frame = _orb_config["update_every_frame"]
 
-        _homography_config["method"] = getattr(cv, _homography_config["method"])
-        _matcher_config["normType"] = getattr(cv, _matcher_config["normType"])
+        if isinstance(_homography_config["method"], str):
+            _homography_config["method"] = getattr(cv, _homography_config["method"])
+            _matcher_config["normType"] = getattr(cv, _matcher_config["normType"])
 
         input_cap = prep_cap(input_video, set_to=0)
         frame_w = int(input_cap.get(cv.CAP_PROP_FRAME_WIDTH))

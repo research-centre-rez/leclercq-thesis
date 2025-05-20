@@ -1,5 +1,6 @@
 import os
 import json
+import sys
 import json5
 import jsonschema
 import argparse
@@ -24,6 +25,7 @@ def parse_args():
     required.add_argument(
         "-i",
         "--input",
+        nargs='+',
         type=str,
         required=True,
         help="Relative (or absolute) path to the video you want to register. Example: --i ../data/1/1-part0_processed.mp4",
@@ -91,17 +93,20 @@ def main(args):
         logger.error("Invalid configuration: \n %s", e.message)
         sys.exit(1)
 
-    if args.output == "auto" or args.output == "automatic":
-        base, _ = os.path.splitext(args.input)
-        args.output = create_out_filename(base, [], ["registered", "stack"])
-
     args.method = RegMethod[args.method.upper()]
 
     reg = VideoRegistrator(method=args.method, config=config)
 
-    reg_analysis = reg.get_registered_block(args.input)
+    for input_path in args.input:
+        if args.output in ["auto", "automatic"]:
+            base, _ = os.path.splitext(input_path)
+            output_path = create_out_filename(base, [], ["registered", "stack"])
+        else:
+            output_path = args.output
 
-    reg.save_registered_block(reg_analysis, args.output)
+        reg_analysis = reg.get_registered_block(input_path)
+
+        reg.save_registered_block(reg_analysis, output_path)
 
 
 if __name__ == "__main__":
