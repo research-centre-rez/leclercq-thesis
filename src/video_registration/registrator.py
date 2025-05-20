@@ -210,8 +210,9 @@ class VideoRegistrator:
             extractor_name=extractor, matcher_config=_matcher, max_num_kp=max_num_kp
         )
 
-        # Parsing the human-readable string into an opencv enum
-        _hom_config["method"] = getattr(cv, _hom_config["method"])
+        if isinstance(_hom_config["method"], str):
+            # Parsing the human-readable string into an opencv enum
+            _hom_config["method"] = getattr(cv, _hom_config["method"])
 
         # Parse the video in a matrix
         vid_stack = create_video_matrix(input_video, grayscale=True)
