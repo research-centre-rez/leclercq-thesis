@@ -59,6 +59,8 @@ class VideoRegistrator:
         self.config = config
 
         self.method: Callable[[str], tuple[np.ndarray, np.ndarray]]
+        self.extractor = None
+        self.matcher = None
 
         if method == RegMethod.ORB:
             self.method = self._get_orb_registration
@@ -89,6 +91,7 @@ class VideoRegistrator:
         Write the registered block and the transformations to memory.
         """
         np.save(save_as, reg_analysis["registered_block"])
+        logger.info("Saved registered stack as %s", save_as)
         self._write_transformation_into_csv(reg_analysis["transformations"], save_as)
 
     def get_registered_block(self, video_input_path: str) -> dict[str, np.ndarray]:
@@ -103,6 +106,7 @@ class VideoRegistrator:
                 "registered_block" (np.ndarray): registered video stack
                 "transformations" (np.ndarray): transformations that were performed at each step
         """
+        logger.info("Processing %s", video_input_path)
         reg_block, transformations = self.method(video_input_path)
         result = {"registered_block": reg_block, "transformations": transformations}
         return result
@@ -206,9 +210,11 @@ class VideoRegistrator:
         max_num_kp = _lglue_config["max_num_keypoints"]
 
         logger.info("Initialising the extractor and matcher")
-        extractor, matcher = self._get_extractor_matcher(
-            extractor_name=extractor, matcher_config=_matcher, max_num_kp=max_num_kp
-        )
+
+        if self.extractor is None or self.matcher is None:
+            self.extractor, self.matcher = self._get_extractor_matcher(
+                extractor_name=extractor, matcher_config=_matcher, max_num_kp=max_num_kp
+            )
 
         if isinstance(_hom_config["method"], str):
             # Parsing the human-readable string into an opencv enum
@@ -227,7 +233,7 @@ class VideoRegistrator:
         fixed_image = numpy_image_to_torch(
             cv.cvtColor(vid_stack[0], cv.COLOR_GRAY2RGB)
         ).cuda()
-        fixed_feats = extractor.extract(fixed_image)
+        fixed_feats = self.extractor.extract(fixed_image)
 
         batch_size = _lglue_config["batch_size"]
 
@@ -249,7 +255,7 @@ class VideoRegistrator:
                 moving_feats = self._create_extracted_batch(
                     vid_stack, i, extractor, batch_size
                 )
-                matches = matcher({"image0": fixed_feats, "image1": moving_feats})
+                matches = self.matcher({"image0": fixed_feats, "image1": moving_feats})
 
                 cpu_fixed_kps = fixed_feats["keypoints"].cpu().numpy()
                 cpu_moving_kps = moving_feats["keypoints"].cpu().numpy()
@@ -382,7 +388,7 @@ class VideoRegistrator:
                     cv.cvtColor(np.zeros_like(vid_stack[0]), cv.COLOR_GRAY2RGB)
                 ).cuda()
 
-            moving_feats = extractor.extract(moving_image)
+            moving_feats = self.extractor.extract(moving_image)
             v_kp = moving_feats["keypoints"]
             v_dp = moving_feats["descriptors"]
             im_size = moving_feats["image_size"]
