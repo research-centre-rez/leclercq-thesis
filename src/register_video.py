@@ -14,7 +14,7 @@ from video_registration import RegMethod, VideoRegistrator
 def parse_args():
     argparser = argparse.ArgumentParser(
         description="Program for registering a single video. Stores the registered video as a numpy matrix where each row represents one frame of the video. Default config can be found in video_registration/default_config.json",
-        formatter_class=argparse.RawTextHelpFormatter,
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
 
     argparser._action_groups.pop()
@@ -60,7 +60,7 @@ def parse_args():
         "--config",
         default="./video_registration/default_config.json5",
         type=str,
-        help="Path to a JSON5 config file that follows the config schema for video registration. Default config can be found in './video_registration/default_config.json5'",
+        help="Path to a JSON5 config file that follows the config schema for video registration.",
     )
 
     return argparser.parse_args()

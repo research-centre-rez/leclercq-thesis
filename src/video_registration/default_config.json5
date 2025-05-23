@@ -1,22 +1,22 @@
 {
   // Configuration parameters for running muDIC
-  mudic:{
+  mudic: {
     // Parameters for the digital image correlation mesh
     mesh_parameters: {
       // Box height and width, in pixels
-      box_h:75,
-      box_w:75,
+      box_h: 75,
+      box_w: 75,
       // How many boxes in the x and y dimensions
-      num_elems_x:6,
-      num_elems_y:6
+      num_elems_x: 6,
+      num_elems_y: 6
     },
     // Maximum number of iterations before the DIC algorithm gives up
-    max_it:150,
+    max_it: 150,
     // How often the reference image should be updated
-    ref_range:5
+    ref_range: 5
   },
   // Configuration for LightGlue registration
-  lightGlue:{
+  lightGlue: {
     /*
       Which extractor do you want to use. The options are the following:
         SuperPoint: https://arxiv.org/abs/1712.07629
@@ -24,49 +24,49 @@
         ALIKED: https://arxiv.org/abs/2304.03608
         SIFT: https://www.cs.ubc.ca/~lowe/papers/ijcv04.pdf
         DoGHardNet: https://github.com/DagnyT/hardnet */
-    extractor:'SuperPoint',
-    batch_size:15,
+    extractor: 'SuperPoint',
+    batch_size: 15,
     /*
       Maximum number of keypoints the extractor should find.
       Setting the parameter to null will result in the extractor returning ALL keypoints */
-    max_num_keypoints:2000,
+    max_num_keypoints: 2000,
     // Parameters for LightGlue
     matcher:{
       // Number of stacked self+cross attention layers. Reduce for faster inference at cost of accuracy
       n_layers: 9,
       // Enable FlashAttention. Increases speed and reduces memory consumption without impact of accuracy
       flash: true,
-      // Enable mixed precision inference. Default is False = off
+      // Enable mixed precision inference, which means using different numerical precisions within the network (16 and 32 bit floats used together). Default is False = off. 
       mp: false,
       // Controls the early stopping. Lower value means stopping more often at earlier layers
       // Disable with -1
-      depth_confidence:0.95,
+      depth_confidence: 0.95,
       // Controls the iterative point pruning. Lower value prunes more points earlier
       // Disable with -1
-      width_confidence:-1,
+      width_confidence: -1,
       // Match confidence, Increase this value to obtain less, but stronger matches
-      filter_threshold:0.1
+      filter_threshold: 0.1
     },
     // These are the parameters for estimating homography between 2 sets of keypoints.
-    homography:{
+    homography: {
       /*
         Which method is used for computing a homography matrix. The following are possible:
           RANSAC - RANSAC-based robust method
           LMEDS  - Least-Median robust method
           RHO    - PROSAC-based robust method */
-      method:"RANSAC",
+      method: "RANSAC",
       /*
         Maximum allowed reprojection error to treat a point pair as an inlier (used ONLY in the RANSAC and RHO methods).
         Since the points are measured in pixels, the documentation recommends to set the parameter in range 1 to 10 */
-      ransacReprojThreshold:8.0,
+      ransacReprojThreshold: 8.0,
       // Confidence level, between 0 and 1
-      confidence:0.9999,
+      confidence: 0.9999,
       // Maximum number of RANSAC iterations
-      maxIters:10000,
+      maxIters: 10000,
     }
   },
-  ORB_parameters:{
-    init_params:{
+  ORB_parameters: {
+    init_params: {
       // Maximum number of features to retain
       nfeatures: 4000,
       // Pyramid decimation ratio, greater than 1. scaleFactor==2 means that each next level will have 4x less pixels than the previous.
@@ -78,41 +78,41 @@
       // The level of pyramid to put source image to. Previous layers are filled with upscaled src image
       firstLevel:0,
       // The number of points that produce each element of the oriented BRIEF descriptor. The default value 2 means the BRIEF where we take a random point pair and compare their brightnesses, so we get 0/1 response. Other possible values are 3 and 4. For example, 3 means that we take 3 random points (of course, those point coordinates are random, but they are generated from the pre-defined seed, so each element of BRIEF descriptor is computed deterministically from the pixel rectangle), find point of maximum brightness and output index of the winner (0, 1 or 2). Such output will occupy 2 bits, and therefore it will need a special variant of Hamming distance, denoted as NORM_HAMMING2 (2 bits per bin). When WTA_K=4, we take 4 random points to compute each bin (that will also occupy 2 bits with possible values 0, 1, 2 or 3).
-      WTA_K:4,
+      WTA_K: 4,
       // The default HARRIS_SCORE(0) means that Harris algorithm is used to rank features (the score is written to KeyPoint::score and is used to retain best nfeatures features); FAST_SCORE(1) is alternative value of the parameter that produces slightly less stable keypoints, but it is a little faster to compute. 
-      scoreType:0,
+      scoreType: 0,
       // The size of the patch used by the oriented BRIEF descriptor. Of course, on smaller pyramid levels the perceived image area covered by a features will be larger
-      patchSize:31,
+      patchSize: 31,
       // The fast threshold
-      fastThreshold:20
+      fastThreshold: 20
     },
     // These are the parameters for estimating homography between 2 sets of keypoints.
-    homography:{
+    homography: {
       /*
         Which method is used for computing a homography matrix. The following are possible:
           RANSAC - RANSAC-based robust method
           LMEDS  - Least-Median robust method
           RHO    - PROSAC-based robust method */
-      method:"RANSAC",
+      method: "RANSAC",
       /*
         Maximum allowed reprojection error to treat a point pair as an inlier (used ONLY in the RANSAC and RHO methods).
         Since the points are measured in pixels, the documentation recommends to set the parameter in range 1 to 10 */
-      ransacReprojThreshold:8.0,
+      ransacReprojThreshold: 8.0,
       // Confidence level, between 0 and 1
-      confidence:0.9999,
+      confidence: 0.9999,
       // Maximum number of RANSAC iterations
-      maxIters:10000,
+      maxIters: 10000,
     },
     // How often the reference image should be updated
-    update_every_frame:2,
+    update_every_frame: 2,
     // Maximum distance allowed between matches
-    max_match_distance:5,
+    max_match_distance: 5,
     // Parameters for the matcher
     matcher: {
       // Which norm is being used, NORM_HAMMING when WTA_K = 2, NORM_HAMMING when WTA_K >= 3
-      normType:"NORM_HAMMING2",
+      normType: "NORM_HAMMING2",
       // If it is false, this is will be default BFMatcher behaviour when it finds the k nearest neighbors for each query descriptor. If crossCheck==true, then the knnMatch() method with k=1 will only return pairs (i,j) such that for i-th query descriptor the j-th descriptor in the matcher's collection is the nearest and vice versa, i.e. the BFMatcher will only return consistent pairs. Such technique usually produces best results with minimal number of outliers when there are enough matches. This is alternative to the ratio test, used by D. Lowe in SIFT paper.
-      crossCheck:true,
+      crossCheck: true,
     },
   }
 }

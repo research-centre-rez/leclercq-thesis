@@ -1,6 +1,5 @@
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from enum import Enum
-import time
 import logging
 import os
 import sys
@@ -12,7 +11,7 @@ from cv2 import ORB
 import muDIC as dic
 from LightGlue.lightglue.utils import Extractor
 from lightglue import LightGlue, SuperPoint, DISK, SIFT, ALIKED, DoGHardNet
-from lightglue.utils import load_image, rbd, numpy_image_to_torch
+from lightglue.utils import numpy_image_to_torch
 import torch
 import torch.nn.functional as F
 
@@ -22,10 +21,8 @@ from utils.disp_utils import extract_medians
 from utils.filename_builder import append_file_extension, create_out_filename
 from utils.prep_cap import prep_cap
 
-from utils.pprint import pprint_dict
-
 from video_registration.mt_homography import compute_and_apply_homography
-from video_registration.mudic_utils import correlate_matrix, create_mesh, get_mesh_nodes
+from video_registration.mudic_utils import correlate_matrix, create_mesh
 from video_registration.video_matrix import create_video_matrix
 
 logger = logging.getLogger(__name__)
@@ -88,7 +85,7 @@ class VideoRegistrator:
         self, reg_analysis: dict[str, np.ndarray], save_as: str
     ) -> None:
         """
-        Write the registered block and the transformations to memory.
+        Write the registered block and the transformations to disc.
         """
         np.save(save_as, reg_analysis["registered_block"])
         logger.info("Saved registered stack as %s", save_as)
@@ -204,21 +201,24 @@ class VideoRegistrator:
         Performs LightGlue registration.
         """
         _lglue_config = self.config.get("lightGlue")
-        _hom_config = _lglue_config["homography"]
+        _homography_config = _lglue_config["homography"]
         _matcher = _lglue_config["matcher"]
         extractor = _lglue_config["extractor"]
-        max_num_kp = _lglue_config["max_num_keypoints"]
+        max_number_keypoints = _lglue_config["max_num_keypoints"]
+        batch_size = _lglue_config["batch_size"]
 
         logger.info("Initialising the extractor and matcher")
 
         if self.extractor is None or self.matcher is None:
             self.extractor, self.matcher = self._get_extractor_matcher(
-                extractor_name=extractor, matcher_config=_matcher, max_num_kp=max_num_kp
+                extractor_name=extractor,
+                matcher_config=_matcher,
+                max_num_kp=max_number_keypoints,
             )
 
-        if isinstance(_hom_config["method"], str):
+        if isinstance(_homography_config["method"], str):
             # Parsing the human-readable string into an opencv enum
-            _hom_config["method"] = getattr(cv, _hom_config["method"])
+            _homography_config["method"] = getattr(cv, _homography_config["method"])
 
         # Parse the video in a matrix
         vid_stack = create_video_matrix(input_video, grayscale=True)
@@ -235,16 +235,18 @@ class VideoRegistrator:
         ).cuda()
         fixed_feats = self.extractor.extract(fixed_image)
 
-        batch_size = _lglue_config["batch_size"]
-
         # Copy over the fixed features for performing parallel kp extraction
-        f_kp = fixed_feats["keypoints"]
-        f_dp = fixed_feats["descriptors"]
-        im_size = fixed_feats["image_size"]
-        f_kp = f_kp.repeat((batch_size, 1, 1))
-        f_dp = f_dp.repeat((batch_size, 1, 1))
-        im_size = im_size.repeat((batch_size, 1))
-        fixed_feats = {"keypoints": f_kp, "descriptors": f_dp, "image_size": im_size}
+        fixed_keypoints = fixed_feats["keypoints"]
+        fixed_descriptors = fixed_feats["descriptors"]
+        image_size = fixed_feats["image_size"]
+        fixed_keypoints = fixed_keypoints.repeat((batch_size, 1, 1))
+        fixed_descriptors = fixed_descriptors.repeat((batch_size, 1, 1))
+        image_size = image_size.repeat((batch_size, 1))
+        fixed_feats = {
+            "keypoints": fixed_keypoints,
+            "descriptors": fixed_descriptors,
+            "image_size": image_size,
+        }
 
         futures = []
 
@@ -252,8 +254,9 @@ class VideoRegistrator:
             total=len(vid_stack[1:]), desc="Glueing"
         ) as pbar:
             for i in range(1, len(vid_stack[1:]), batch_size):
+                # Batch up the the images
                 moving_feats = self._create_extracted_batch(
-                    vid_stack, i, extractor, batch_size
+                    vid_stack, i, batch_size
                 )
                 matches = self.matcher({"image0": fixed_feats, "image1": moving_feats})
 
@@ -269,7 +272,7 @@ class VideoRegistrator:
                                 cpu_moving_kps[idx],
                                 match.cpu().numpy(),
                                 vid_stack[idx + i],
-                                _hom_config,
+                                _homography_config,
                                 out_res,
                                 idx + i,
                             )
@@ -278,6 +281,8 @@ class VideoRegistrator:
                     else:
                         break
 
+            # Because we are doing homography asynchronously, we place the warped
+            # images into the resulting matrix directly
             for future in as_completed(futures):
                 result = future.result()
                 if result is not None:
@@ -368,11 +373,12 @@ class VideoRegistrator:
         logger.info("Stored csv data about transformation in %s", save_as)
 
     def _create_extracted_batch(
-        self, vid_stack, video_index, extractor, batch_size
+        self, vid_stack, video_index, batch_size
     ) -> dict[str, torch.Tensor]:
         """
-        Creates a batch that can be then passed into LightGlue
+        Creates a batch that can be then passed into LightGlue.
         """
+
         batched_kp = []
         batched_dp = []
         batched_imsize = []
@@ -391,11 +397,11 @@ class VideoRegistrator:
             moving_feats = self.extractor.extract(moving_image)
             v_kp = moving_feats["keypoints"]
             v_dp = moving_feats["descriptors"]
-            im_size = moving_feats["image_size"]
+            image_size = moving_feats["image_size"]
             max_kp = max(max_kp, v_kp.shape[1])
             batched_kp.append(v_kp)
             batched_dp.append(v_dp)
-            batched_imsize.append(im_size)
+            batched_imsize.append(image_size)
 
         # Pad the keypoints and descriptors for pytorch
         padded_kp = [F.pad(kp, (0, 0, 0, max_kp - kp.shape[1])) for kp in batched_kp]
@@ -426,10 +432,10 @@ class VideoRegistrator:
             extractor = SIFT(max_num_keypoints=max_num_kp).eval().cuda()
             matcher = LightGlue(features="sift", **matcher_config).eval().cuda()
         elif extractor_name == "ALIKED":
-            extractor = ALIKED(max_num_kp=max_num_kp).eval().cuda()
+            extractor = ALIKED(max_num_keypoints=max_num_kp).eval().cuda()
             matcher = LightGlue(features="aliked", **matcher_config).eval().cuda()
         elif extractor_name == "DoGHardNet":
-            extractor = DoGHardNet(max_num_kp=max_num_kp).eval().cuda()
+            extractor = DoGHardNet(max_num_keypoints=max_num_kp).eval().cuda()
             matcher = LightGlue(features="doghardnet", **matcher_config).eval().cuda()
         else:
             logger.error("Invalid keypoint extractor given, exiting.")

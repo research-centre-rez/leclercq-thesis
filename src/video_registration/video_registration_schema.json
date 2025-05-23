@@ -82,7 +82,7 @@
             },
             "mp": {
               "type": "boolean",
-              "description": "Enable mixed precision inference. Default is False = off"
+              "description": "Enable mixed precision inference, which means using different numerical precisions within the network (16 and 32 bit floats used together). Default is False = off"
             },
             "depth_confidence": {
               "type": "number",
