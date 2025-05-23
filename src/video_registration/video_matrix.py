@@ -32,11 +32,11 @@ def create_video_matrix(vid_path: str, grayscale: bool) -> np.ndarray:
     bytes_per_pixel = 1  # Assuming uint8 image
 
     approx_bytes = frame_count * frame_height * frame_width * channels * bytes_per_pixel
-    approx_gb = approx_bytes / (1024 ** 3)
+    approx_gb = approx_bytes / (1024**3)
 
     logger.warning(
-
-        "\n Decoding video to RAM — estimated memory usage: %s GB\n", round(approx_gb, 2)
+        "\n Decoding video to RAM — estimated memory usage: %s GB\n",
+        round(approx_gb, 2),
     )
     # Append the frames to a Python list first
     frames = []
