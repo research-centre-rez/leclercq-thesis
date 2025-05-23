@@ -221,7 +221,9 @@ class VideoRegistrator:
             _homography_config["method"] = getattr(cv, _homography_config["method"])
 
         # Parse the video in a matrix
-        vid_stack = create_video_matrix(input_video, grayscale=True)
+        vid_stack = create_video_matrix(input_video, grayscale=True, max_gb_memory=5)
+        if vid_stack.size == 0:
+            sys.exit()
 
         # First image in the sequence has no transformation
         transformations = np.zeros((len(vid_stack), 3, 3))
