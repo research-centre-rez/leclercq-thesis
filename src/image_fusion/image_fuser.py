@@ -1,12 +1,13 @@
 from enum import Enum
 import logging
 import os
-from typing import Callable, Union
+from typing import Union
 
 import numpy as np
 import cv2 as cv
 
 from utils.filename_builder import append_file_extension, create_out_filename
+from sklearn.decomposition import PCA, IncrementalPCA, TruncatedSVD
 
 logger = logging.getLogger(__name__)
 
@@ -14,6 +15,9 @@ class FuseMethod(Enum):
     MIN = 0
     MAX = 1
     VAR = 2
+    PCA = 3
+    MED = 4
+    MEAN = 5
 
 
 class ImageFuser:
@@ -21,14 +25,12 @@ class ImageFuser:
     Class responsible for creating fused images
     """
 
-    def __init__(self, config):
+    def __init__(self):
         """
         Init method of the ImageFuser class.
         """
 
-        self.config = config
-
-    def write_to_memory(self, fused_image: np.ndarray, save_as: str) -> None:
+    def write_to_disc(self, fused_image: np.ndarray, save_as: str) -> None:
         """
         Writes the fused image to memory.
         """
@@ -40,7 +42,15 @@ class ImageFuser:
         os.makedirs(path, exist_ok=True)
         cv.imwrite(save_as, fused_image)
 
-    def write_gallery_to_memory(self, gallery:dict[str, np.ndarray], save_as:str) -> None:
+    def write_gallery_to_disc(self, gallery:dict[str, np.ndarray], save_as:str) -> None:
+        '''
+        Writes the gallery to disc, automatically appending the fuse method to the end of the filename.
+        Args:
+            gallery (dict[str, np.ndarray]): Gallery obtained from `self.get_fused_gallery`
+            save_as (str): how the gallery should be saved as. without the file extension
+        Returns:
+            None
+        '''
 
         path, _ = os.path.split(save_as)
         os.makedirs(path, exist_ok=True)
@@ -67,11 +77,20 @@ class ImageFuser:
         if FuseMethod.VAR in methods:
             gallery["VAR"] = self._get_var_image(vid_stack)
 
+        if FuseMethod.PCA in methods:
+            gallery["PCA"] = self._get_pca_image(vid_stack)
+
+        if FuseMethod.MED in methods:
+            gallery["MED"] = self._get_median_image(vid_stack)
+
+        if FuseMethod.MEAN in methods:
+            gallery["MEAN"] = self._get_mean_image(vid_stack)
+
         return gallery
 
     def get_fused_image(self, video_stack: Union[str, np.ndarray], method: FuseMethod) -> np.ndarray:
         """
-        Returns the fused image for a video stack. The `method` used is the one that was specified at initialisation.
+        Returns the fused image for a video stack. Used if you only want to use one image fusing method.
         """
 
         video_stack = self._verify_video_stack(video_stack)
@@ -79,11 +98,20 @@ class ImageFuser:
         if method == FuseMethod.MAX:
             return self._get_max_image(video_stack)
 
-        if method == FuseMethod.MIN:
+        elif method == FuseMethod.MIN:
             return self._get_min_image(video_stack)
 
-        if method == FuseMethod.VAR:
+        elif method == FuseMethod.VAR:
             return self._get_var_image(video_stack)
+
+        elif method == FuseMethod.PCA:
+            return self._get_pca_image(video_stack)
+
+        elif method == FuseMethod.MEAN:
+            return self._get_mean_image(video_stack)
+
+        elif method == FuseMethod.MED:
+            return self._get_median_image(video_stack)
 
     def get_min_mask(self, video_stack: Union[str, np.ndarray]) -> np.ndarray:
         """
@@ -126,6 +154,38 @@ class ImageFuser:
 
     def _get_var_image(self, video_stack: np.ndarray) -> np.ndarray:
         """
-        Returns the variance across the video stack
+        Returns the variance across the video stack. 
+        WARNING:
+            `np.var` has a really high space complexity of O = n^2. Therefore it could happen that you run out of RAM memory.
         """
-        return video_stack.var(axis=0, dtype=np.float16)
+        var_img = video_stack.var(axis=0, dtype=np.float32)
+
+        # normalise the image
+        var_img = cv.normalize(var_img, None, alpha=0, beta=255, norm_type=cv.NORM_MINMAX, dtype=cv.CV_32F)
+
+        return var_img.astype(np.uint8)
+
+    def _get_pca_image(self, video_stack:np.ndarray) -> np.ndarray:
+        n, h, w = video_stack.shape
+        reshaped = video_stack.reshape(n, -1)  # shape: (n, h*w)
+
+        # Perform SVD with 1 component
+        svd = TruncatedSVD(n_components=1)
+
+        # Use the first principal component to reconstruct the "fused" image
+        # Multiply scores by component to get 1D image
+        # fused_1d = (svd_img_1d @ svd.components_)  # shape: (n, h*w)
+        fused_1d = svd.components_[0]  # shape: (h*w,)
+
+        # Reshape to image
+        fused_img = fused_1d.reshape(h, w)
+
+        # Normalize to 8-bit image
+        fused_img = cv.normalize(fused_img, None, 0, 255, cv.NORM_MINMAX)
+        return fused_img.astype(np.uint8)
+
+    def _get_mean_image(self, video_stack:np.ndarray) -> np.ndarray:
+        return video_stack.mean(axis=0)
+
+    def _get_median_image(self, video_stack:np.ndarray) -> np.ndarray:
+        return np.median(video_stack, axis=0)
