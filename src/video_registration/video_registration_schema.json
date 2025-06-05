@@ -1,0 +1,283 @@
+{
+  "type": "object",
+  "properties": {
+    "mudic": {
+      "type": "object",
+      "properties": {
+        "mesh_parameters": {
+          "type": "object",
+          "properties": {
+            "box_h": {
+              "type": "integer"
+            },
+            "box_w": {
+              "type": "integer"
+            },
+            "num_elems_x": {
+              "type": "integer"
+            },
+            "num_elems_y": {
+              "type": "integer"
+            }
+          },
+          "description": "box_h and box_w specify the box dimensions in pixels. Number of elements specifies how many boxes you want in the DIC",
+          "required": [
+            "box_h",
+            "box_w",
+            "num_elems_x",
+            "num_elems_y"
+          ]
+        },
+        "max_it": {
+          "type": "integer",
+          "description": "Max number of iteration before muDIC gives up"
+        },
+        "ref_range": {
+          "type": "integer",
+          "description": "How often the reference image is updated"
+        }
+      },
+      "required": [
+        "mesh_parameters",
+        "max_it",
+        "ref_range"
+      ]
+    },
+    "lightGlue": {
+      "type": "object",
+      "description": "Parameters used for performing image registration with lightGlue",
+      "properties": {
+        "extractor": {
+          "type": "string",
+          "enum": [
+            "SuperPoint",
+            "DISK",
+            "ALIKED",
+            "SIFT",
+            "DoGHardNet"
+          ],
+          "description": "Which extractor do you want to use? Options are: SuperPoint, DISK, ALIKED, SIFT, DoGHardNet"
+        },
+        "batch_size": {
+          "type": "integer",
+          "description": "How many frames will be processed in parallel"
+        },
+        "max_num_keypoints": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "What is the maximum number of keypoints that should be returned"
+        },
+        "matcher": {
+          "type": "object",
+          "properties": {
+            "n_layers": {
+              "type": "integer",
+              "description": "Number of stacked self+cross attention layers. Reduce for faster inference at cost of accuracy"
+            },
+            "flash": {
+              "type": "boolean",
+              "description": "Enable FlashAttention. Increases speed and reduces memory consumption without impact of accuracy"
+            },
+            "mp": {
+              "type": "boolean",
+              "description": "Enable mixed precision inference, which means using different numerical precisions within the network (16 and 32 bit floats used together). Default is False = off"
+            },
+            "depth_confidence": {
+              "type": "number",
+              "description": "Controls the early stopping. Lower value means stopping more often at earlier layers. Disable with -1"
+            },
+            "width_confidence": {
+              "type": "number",
+              "description": "Controls the iterative point pruning. Lower value prunes more points earlier. Disable with -1"
+            },
+            "filter_threshold": {
+              "type": "number",
+              "description": "Match confidence, Increase this value to obtain less, but stronger matches"
+            }
+          },
+          "required": [
+            "n_layers",
+            "flash",
+            "mp",
+            "depth_confidence",
+            "width_confidence",
+            "filter_threshold"
+          ]
+        },
+        "homography": {
+          "type": "object",
+          "description": "These are the parameters for estimating homography between 2 sets of keypoints.",
+          "properties": {
+            "method": {
+              "type": "string",
+              "enum": [
+                "RANSAC",
+                "LMEDS",
+                "RHO"
+              ],
+              "description": "Which method is used for computing a homography matrix. The following are possible:"
+            },
+            "ransacReprojThreshold": {
+              "type": "number",
+              "description": "Maximum allowed reprojection error to treat a point pair as an inlier (used ONLY in the RANSAC and RHO methods)."
+            },
+            "confidence": {
+              "type": "number",
+              "description": "Confidence level, between 0 and 1"
+            },
+            "maxIters": {
+              "type": "integer",
+              "description": "Maximum number of RANSAC iterations"
+            }
+          },
+          "required": [
+            "method",
+            "ransacReprojThreshold",
+            "confidence",
+            "maxIters"
+          ]
+        }
+      },
+      "required": [
+        "extractor",
+        "batch_size",
+        "max_num_keypoints",
+        "matcher",
+        "homography"
+      ]
+    },
+    "ORB_parameters": {
+      "type": "object",
+      "description": "Parameters used for performing ORB registration",
+      "properties": {
+        "init_params": {
+          "type": "object",
+          "properties": {
+            "nfeatures": {
+              "type": "integer",
+              "description": "Maximum number of features to retain"
+            },
+            "scaleFactor": {
+              "type": "number",
+              "description": "Pyramid decimation ratio, greater than 1. scaleFactor==2 means that each next level will have 4x less pixels than the previous."
+            },
+            "nlevels": {
+              "type": "integer",
+              "description": "The number of pyramid levels. The smallest level will have linear size equal to input_image_size/pow(scaleFactor, nlevels - firstLevel)"
+            },
+            "edgeThreshold": {
+              "type": "integer",
+              "description": "Size of the border where the features are not detected. Should roughly match the patchSize parameter"
+            },
+            "firstLevel": {
+              "type": "integer",
+              "description": "The level of pyramid to put source image to. Previous layers are filled with upscaled src image"
+            },
+            "WTA_K": {
+              "type": "integer",
+              "description": "The number of points that produce each element of the oriented BRIEF descriptor. The default value 2 means the BRIEF where we take a random point pair and compare their brightnesses, so we get 0/1 response. Other possible values are 3 and 4. For example, 3 means that we take 3 random points (of course, those point coordinates are random, but they are generated from the pre-defined seed, so each element of BRIEF descriptor is computed deterministically from the pixel rectangle), find point of maximum brightness and output index of the winner (0, 1 or 2). Such output will occupy 2 bits, and therefore it will need a special variant of Hamming distance, denoted as NORM_HAMMING2 (2 bits per bin). When WTA_K=4, we take 4 random points to compute each bin (that will also occupy 2 bits with possible values 0, 1, 2 or 3)."
+            },
+            "scoreType": {
+              "type": "integer",
+              "description": "The default HARRIS_SCORE(0) means that Harris algorithm is used to rank features (the score is written to KeyPoint::score and is used to retain best nfeatures features); FAST_SCORE(1) is alternative value of the parameter that produces slightly less stable keypoints, but it is a little faster to compute. "
+            },
+            "patchSize": {
+              "type": "integer",
+              "description": "The size of the patch used by the oriented BRIEF descriptor. Of course, on smaller pyramid levels the perceived image area covered by a features will be larger"
+            },
+            "fastThreshold": {
+              "type": "integer",
+              "description": "The fast threshold"
+            }
+          },
+          "required": [
+            "nfeatures",
+            "scaleFactor",
+            "nlevels",
+            "edgeThreshold",
+            "firstLevel",
+            "WTA_K",
+            "scoreType",
+            "patchSize",
+            "fastThreshold"
+          ]
+        },
+        "homography": {
+          "type": "object",
+          "description": "These are the parameters for estimating homography between 2 sets of keypoints.",
+          "properties": {
+            "method": {
+              "type": "string",
+              "enum": [
+                "RANSAC",
+                "LMEDS",
+                "RHO"
+              ],
+              "description": "Which method is used for computing a homography matrix. The following are possible:"
+            },
+            "ransacReprojThreshold": {
+              "type": "number",
+              "description": "Maximum allowed reprojection error to treat a point pair as an inlier (used ONLY in the RANSAC and RHO methods)."
+            },
+            "confidence": {
+              "type": "number",
+              "description": "Confidence level, between 0 and 1"
+            },
+            "maxIters": {
+              "type": "integer",
+              "description": "Maximum number of RANSAC iterations"
+            }
+          },
+          "required": [
+            "method",
+            "ransacReprojThreshold",
+            "confidence",
+            "maxIters"
+          ]
+        },
+        "update_every_frame": {
+          "type": "integer",
+          "description": "How often the reference image should be updated"
+        },
+        "max_match_distance": {
+          "type": "integer",
+          "description": "Maximum distance allowed between matches"
+        },
+        "matcher": {
+          "type": "object",
+          "properties": {
+            "normType": {
+              "type": "string",
+              "enum": [
+                "NORM_HAMMING",
+                "NORM_HAMMING2"
+              ],
+              "description": "Which norm is being used, NORM_HAMMING when WTA_K = 2, NORM_HAMMING when WTA_K >= 3"
+            },
+            "crossCheck": {
+              "type": "boolean",
+              "description": "If it is false, this is will be default BFMatcher behaviour when it finds the k nearest neighbors for each query descriptor. If crossCheck==true, then the knnMatch() method with k=1 will only return pairs (i,j) such that for i-th query descriptor the j-th descriptor in the matcher's collection is the nearest and vice versa, i.e. the BFMatcher will only return consistent pairs. Such technique usually produces best results with minimal number of outliers when there are enough matches. This is alternative to the ratio test, used by D. Lowe in SIFT paper."
+            }
+          },
+          "required": [
+            "normType",
+            "crossCheck"
+          ]
+        }
+      },
+      "required": [
+        "init_params",
+        "update_every_frame",
+        "max_match_distance",
+        "matcher"
+      ]
+    }
+  },
+  "required": [
+    "mudic",
+    "lightGlue",
+    "ORB_parameters"
+  ]
+}
