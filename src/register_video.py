@@ -81,14 +81,14 @@ def main(args):
         level=logging.INFO, format="%(levelname)s:%(name)s: %(message)s"
     )
     logger = logging.getLogger(__name__)
-    pprint.pprint_argparse(args, logger)
+    pprint.log_argparse(args)
 
     CONFIG_SCHEMA = load_json_schema("./video_registration/video_registration_schema.json")
     try:
         config = load_config(args.config)
         jsonschema.validate(instance=config, schema=CONFIG_SCHEMA)
         logger.info("Successfully validated the submitted config")
-        pprint.pprint_dict(config, "Config parameters", logger)
+        pprint.pprint_dict(config, "Config parameters")
     except jsonschema.ValidationError as e:
         logger.error("Invalid configuration: \n %s", e.message)
         sys.exit(1)
