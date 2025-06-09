@@ -1,1 +1,1 @@
-from .image_fuser import ImageFuser, FuseMethod
+from .factory_fuser import ImageFuserFactory, FuseMethod
