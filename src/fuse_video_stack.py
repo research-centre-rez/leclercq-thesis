@@ -65,7 +65,7 @@ def main(args):
     logger = logging.getLogger(__name__)
     pprint.log_argparse(args)
 
-    fuser = ImageFuserFactory()
+    fuser_factory = ImageFuserFactory()
 
     # Using all fusing methods
     if "all" in args.method:
@@ -76,7 +76,7 @@ def main(args):
         methods = [FuseMethod[m.upper()] for m in args.method]
 
     # Getting all of the required fusers
-    fusers = [fuser.get_strategy(strat) for strat in methods]
+    fusers = [fuser_factory.get_fuser(method) for method in methods]
     gallery = {}
 
     # Go over each of the input files

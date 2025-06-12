@@ -47,7 +47,7 @@ class Fuser:
         base, ext = os.path.splitext(name)
 
         # Gracefully wrong file extensions
-        if ext is None or ext not in [".png", ".jpeg"]:
+        if ext is None or ext not in [".png"]:
             logger.warning(
                 "Invalid extension, must be one of %s, but instead got: %s. Setting extension to be '.png'"
             )
@@ -187,7 +187,7 @@ class ImageFuserFactory:
     }
 
     @classmethod
-    def get_strategy(cls, method: FuseMethod) -> Fuser:
+    def get_fuser(cls, method: FuseMethod) -> Fuser:
         """
         Returns a specified strategy, has to be in the `self._registry`
         """
