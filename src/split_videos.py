@@ -16,7 +16,7 @@ import shutil
 from data_preprocessing import detect_black_frames
 from data_preprocessing import split_video
 
-from utils.pprint import pprint_dict, log_argparse
+from utils import pprint
 
 os.environ["OPENCV_FFMPEG_READ_ATTEMPTS"] = "100000"
 # TODO: Add this to docker
@@ -30,8 +30,8 @@ def parse_args():
     req = argparser.add_argument_group('required arguments')
 
     # Required arguments
-    req.add_argument('-i', '--input', type=str, required=True, help='Path to the input video')
-    req.add_argument('-o', '--output', type=str,required=True, help='Where do you want the video to be saved')
+    req.add_argument('-i', '--input', type=str, required=True, help='Path to the input video or to the directory that contains videos that you want to split. The program will run through all of the videos that it can find in the directory.')
+    req.add_argument('-o', '--output', type=str,required=True, help='Where do you want the videos to be saved')
 
     return argparser.parse_args()
 
@@ -41,18 +41,25 @@ def _split_videos_in_directory(directory_path:str, output_dir:str) -> None:
     '''
     os.makedirs(output_dir, exist_ok=True)
 
-    for file in sorted(os.listdir(directory_path)):
-        if file.upper().endswith('.MP4'):
-            video_path = os.path.join(directory_path, file)
-            # _split_video handles errors with video creation
-            _split_video(video_path, output_dir)
+    found_any = False
+    for root, _, files in os.walk(directory_path):
+        for file in sorted(files):
+            if file.upper().endswith('.MP4'):
+                rel_dir = os.path.relpath(root, directory_path)
+                rel_out_dir = os.path.join(output_dir, rel_dir)
+                video_path = os.path.join(root, file)
 
-    # In case no videos are created (everything failed)
-    if not os.listdir(output_dir):
-        os.rmdir(output_dir)
+                _split_video(video_path, rel_out_dir)
+                found_any = True
 
+    # In case no videos were processed successfully
+    if not found_any or not os.listdir(output_dir):
+        try:
+            os.rmdir(output_dir)
+        except OSError:
+            pass  # Directory not empty or failed for some other reason
 
-def _split_video(vid_path, out_path):
+def _split_video(vid_path:str, out_path:str) -> None:
     os.makedirs(out_path, exist_ok=True)
     try:
         black_f_id, fps = detect_black_frames(vid_path)
