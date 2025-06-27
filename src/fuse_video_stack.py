@@ -3,7 +3,7 @@ import logging
 import os
 import sys
 
-from image_fusion import ImageFuserFactory, FuseMethod
+from image_fusion import ImageFuserFactory, FuseMethod, crop_image
 from utils import pprint
 from utils.filename_builder import create_out_filename
 
@@ -15,6 +15,7 @@ def parse_args():
     )
 
     required = argparser.add_argument_group("required arguments")
+    optional = argparser.add_argument_group("optional arguments")
 
     required.add_argument(
         "-i",
@@ -55,6 +56,13 @@ def parse_args():
             "\n all: Use all of the available methods"
         ),
     )
+
+    optional.add_argument(
+        "--crop", 
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Should the final image be cropped such that it only contains the sample? Background will be thrown away."
+    )
     return argparser.parse_args()
 
 
@@ -77,6 +85,17 @@ def main(args):
 
     # Getting all of the required fusers
     fusers = [fuser_factory.get_fuser(method) for method in methods]
+
+    # If cropping is required, find the MIN fuser
+    min_fuser = None
+    if args.crop:
+        for f in fusers:
+            if f.method == FuseMethod.MIN:
+                min_fuser = f
+                break
+        if min_fuser is None:
+            min_fuser = fuser_factory.get_fuser(FuseMethod.MIN)
+
     gallery = {}
 
     # Go over each of the input files
@@ -96,6 +115,13 @@ def main(args):
         for fuser in fusers:
             # Create a gallery for later image processing
             gallery[fuser.method] = fuser.get_fused_image(input_path)
+
+            if args.crop:
+                min_mask = min_fuser.get_min_mask(input_path)
+
+                for method, image in gallery.items():
+                    gallery[method] = crop_image(image, min_mask)
+
             # Save the image to disc
             fuser.save_image_to_disc(gallery[fuser.method], output_path)
 
