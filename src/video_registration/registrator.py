@@ -329,7 +329,7 @@ class VideoRegistrator:
         n, h, w = image_stack.shape
 
         x_c, y_c = self._fit_ellipse(displacement)
-        transformations = [np.eye(2, 3)]
+        transformations = [np.eye(3, 3)]
 
         for i in tqdm(range(n), desc="Registering by shift"):
             image = image_stack[i]

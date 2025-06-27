@@ -1,64 +1,201 @@
+from enum import Enum, auto
+from typing import Union
 import numpy as np
 import cv2 as cv
+from skimage.metrics import structural_similarity as ssim
 
 
-def normalised_grey_level_variance(image_path: str):
-    """
-    Computes the NGLV metric for an image.
-    """
-
-    image_grayscale = cv.imread(image_path, cv.IMREAD_GRAYSCALE)
-
-    img_mean = np.mean(image_grayscale)
-    img_var = np.var(image_grayscale)
-
-    H, W = image_grayscale.shape
-    return img_var / (img_mean)
+class normType(Enum):
+    std = auto()
+    minmax = auto()
+    equalHist = auto()
+    clahe = auto()
+    mean_sub = auto()
+    l2 = auto()
+    grad_mag = auto()
+    grad_equal_hist = auto()
 
 
-def brenner_method(image: str):
-    """
-    Calculate Brenner's focus metric using the formula:
-    ϕ = Σ_i Σ_j max(|I(i,j) - I(i+2,j)|, |I(i,j) - I(i,j+2)|)^2
+class Metric:
 
-    Args:
-        image: 2D numpy array representing a grayscale image
+    def __init__(self) -> None:
+        pass
 
-    Returns:
-        phi: Brenner's focus metric (float)
-    """
-    image = cv.imread(image, cv.IMREAD_GRAYSCALE)
-    # Convert to float for calculations
-    img = image
-    H, W = img.shape
+    def calculate_metric(self, img_path: str) -> np.ndarray:
+        raise ValueError("Each subclass should implement this on its own")
 
-    # Initialize metric at 0.0
-    phi = 0.0
+    def _normalise_img(self, image: np.ndarray, normType: normType):
+        image = image.astype(np.float64)
 
-    # Handle images too small for the calculation
-    if H < 3 or W < 3:
-        return phi
+        if normType == normType.std:
+            return (image - np.mean(image)) / (np.std(image + 1e-8))
 
-    # Create shifted versions of the image
-    down_shifted = np.zeros_like(img)
-    right_shifted = np.zeros_like(img)
+        if normType == normType.minmax:
+            return (image - image.min()) / (image.max() - image.min() + 1e-8)
 
-    # Shift image down by 2 rows (top rows become zero)
-    down_shifted[:-2, :] = img[2:, :]
+        if normType == normType.equalHist:
+            return cv.equalizeHist(image.astype(np.uint8))
 
-    # Shift image right by 2 columns (left columns become zero)
-    right_shifted[:, :-2] = img[:, 2:]
+        if normType == normType.clahe:
+            clahe = cv.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+            return clahe.apply(image.astype(np.uint8))
 
-    # Calculate absolute differences
-    diff_down = np.abs(img - down_shifted)
-    diff_right = np.abs(img - right_shifted)
+        if normType == normType.mean_sub:
+            return image - image.mean()
 
-    # Take element-wise maximum of the two differences
-    max_diff = np.maximum(diff_down, diff_right)
+        if normType == normType.l2:
+            return image - (np.linalg.norm(image) + 1e-8)
 
-    # Square the max differences and sum (only valid regions)
-    # Valid region: rows 0 to H-3 and columns 0 to W-3
-    valid_region = max_diff[: H - 2, : W - 2]  # Exclude last 2 rows and columns
-    phi = np.sum(valid_region**2)
+        if normType == normType.grad_mag:
+            gx = cv.Sobel(image, cv.CV_64F, 1, 0, ksize=3)
+            gy = cv.Sobel(image, cv.CV_64F, 0, 1, ksize=3)
+            grad_mag = np.sqrt(gx**2 + gy**2)
+            return (grad_mag - grad_mag.min()) / (grad_mag.max() - grad_mag.min() + 1e-8)
 
-    return phi
+        if normType == normType.grad_equal_hist:
+            gx = cv.Sobel(image, cv.CV_64F, 1, 0, ksize=3)
+            gy = cv.Sobel(image, cv.CV_64F, 0, 1, ksize=3)
+            grad_mag = np.sqrt(gx**2 + gy**2)
+            grad_mag = 255 * (grad_mag / (grad_mag.max() + 1e-8))
+            grad_mag_uint8 = grad_mag.astype(np.uint8)
+            clahe = cv.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+            return clahe.apply(grad_mag_uint8)
+
+        return image
+
+    def _mask_sample(selt, img) -> np.ndarray:
+        h,w = img.shape[:2]
+        mask = np.zeros((h,w), np.uint8)
+        radius = h // 2
+        centre = (w // 2, h // 2)
+        cv.circle(mask, centre, radius, 255, thickness=-1)
+        masked_img = cv.bitwise_and(img, img, mask=mask)
+        return masked_img
+
+    def _load_img_to_memory(self, img_path: str, use_float: bool) -> np.ndarray:
+        image = cv.imread(img_path, cv.IMREAD_GRAYSCALE)
+
+        if use_float:
+            image = self._mask_sample(image)
+            image = image.astype(float) / 255
+            image = self._normalise_img(image, normType.grad_mag)
+            return image
+
+        return image
+
+
+class NGLV(Metric):
+
+    def calculate_metric(self, img_path: Union[str, np.ndarray]) -> np.ndarray:
+        if isinstance(img_path, str):
+            image = self._load_img_to_memory(img_path, use_float=True)
+        else:
+            image = img_path.astype(float) / 255
+
+        mean, std_dev = cv.meanStdDev(image)
+        result = std_dev[0] ** 2 / mean[0]
+        return result[0]
+
+
+class BrennerMethod(Metric):
+
+    def calculate_metric(self, img_path: Union[str, np.ndarray]) -> np.ndarray:
+        if isinstance(img_path, str):
+            image = self._load_img_to_memory(img_path, use_float=True)
+        else:
+            image = img_path.astype(float) / 255
+
+        diff_x = np.abs(np.subtract(image[:-2, 2:], image[:-2, :-2], dtype=np.float64))
+        diff_y = np.abs(np.subtract(image[2:, :-2], image[:-2, :-2], dtype=np.float64))
+
+        return np.sum(np.maximum(diff_x, diff_y) ** 2)
+
+
+class AbsoluteGradient(Metric):
+
+    def calculate_metric(self, img_path: Union[str, np.ndarray]) -> np.ndarray:
+        if isinstance(img_path, str):
+            image = self._load_img_to_memory(img_path, use_float=True)
+        else:
+            image = img_path.astype(float) / 255
+
+        I_x = np.abs(np.diff(image, 1, 1, 0))
+        I_y = np.abs(np.diff(image, 1, 0, 0))
+        grad = np.maximum(I_x, I_y)
+        return np.sum(grad)
+
+        norm_grad = np.sum(grad) / grad.size  # average gradient per pixel
+        return norm_grad
+
+
+class VarianceOfLaplacian(Metric):
+
+    def calculate_metric(self, img_path: str) -> np.ndarray:
+        image = self._load_img_to_memory(img_path, True)
+
+        laplacian = cv.Laplacian(image, cv.CV_64F)[1:-1, 1:-1].var()
+        return laplacian
+
+
+class Tenengrad(Metric):
+
+    def calculate_metric(self, img_path: str) -> np.ndarray:
+        image = self._load_img_to_memory(img_path, True)
+        grad_x = cv.Sobel(image, cv.CV_64F, 1, 0, 3)
+        grad_y = cv.Sobel(image, cv.CV_64F, 0, 1, 3)
+        return np.sum(grad_x**2 + grad_y**2)
+
+
+class SSIM(Metric):
+    def _load_video_stack(self, stack_path: str) -> np.ndarray:
+        return np.load(stack_path)
+
+    def calculate_metric(self, stack_path: str) -> np.ndarray:
+        video_stack = self._load_video_stack(stack_path)
+        # video_stack = video_stack.astype(float) / 255
+        mean_img = np.mean(video_stack, axis=0)
+        print(video_stack.max())
+        print(mean_img.max())
+        print("Calculating metric..")
+        ssim_scores = [
+            ssim(img, mean_img, data_range=255, full=False) for img in video_stack
+        ]
+        print(f"Mean SSIM scores: {np.mean(ssim_scores)}")
+        return np.mean(ssim_scores)
+
+
+class MutualInformation(Metric):
+    def _load_video_stack(self, stack_path: str) -> np.ndarray:
+        return np.load(stack_path)
+
+    def _mutual_information(
+        self, img1: np.ndarray, img2: np.ndarray, bins: int = 256
+    ) -> float:
+        """
+        Computes mutual information between two images using histogram estimation.
+
+        Args:
+            img1, img2: 2D numpy arrays (grayscale images)
+            bins: number of bins for joint histogram
+
+        Returns:
+            Normalized mutual information score (float)
+        """
+        hgram, _, _ = np.histogram2d(img1.ravel(), img2.ravel(), bins=bins)
+        pxy = hgram / np.sum(hgram)
+        px = np.sum(pxy, axis=1)  # marginal for x
+        py = np.sum(pxy, axis=0)  # marginal for y
+
+        px_py = px[:, None] * py[None, :]
+        nz = pxy > 0
+        mi = np.sum(pxy[nz] * np.log(pxy[nz] / px_py[nz]))
+        return mi
+
+    def calculate_metric(self, stack_path: str) -> float:
+        video_stack = self._load_video_stack(stack_path)
+        mean_img = np.max(video_stack, axis=0)
+
+        mi_scores = [self._mutual_information(img, mean_img) for img in video_stack]
+
+        print(f"Mean MI scores: {np.mean(mi_scores)}")
+        return np.mean(mi_scores)
