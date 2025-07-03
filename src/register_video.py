@@ -83,6 +83,20 @@ def main(args):
     logger = logging.getLogger(__name__)
     pprint.log_argparse(args)
 
+    # Console handler (shows INFO and above)
+    ch = logging.StreamHandler(sys.stdout)
+    ch.setLevel(logging.INFO)
+    ch.setFormatter(logging.Formatter("%(levelname)s:%(name)s: %(message)s"))
+
+    # File handler (only logs errors)
+    fh = logging.FileHandler("failures.log")
+    fh.setLevel(logging.ERROR)
+    fh.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
+
+    logger.addHandler(ch)
+    logger.addHandler(fh)
+    pprint.log_argparse(args)
+
     CONFIG_SCHEMA = load_json_schema("./video_registration/video_registration_schema.json")
     try:
         config = load_config(args.config)
@@ -100,13 +114,19 @@ def main(args):
     for input_path in args.input:
         if args.output in ["auto", "automatic"]:
             base, _ = os.path.splitext(input_path)
-            output_path = create_out_filename(base, [], ["registered", "stack"])
+            output_path = create_out_filename(base, [], ["registered", "stack", args.method.name])
         else:
             output_path = args.output
 
-        reg_analysis = reg.get_registered_block(input_path)
+        try:
+            reg_analysis = reg.get_registered_block(input_path)
 
-        reg.save_registered_block(reg_analysis, output_path)
+            reg.save_registered_block(reg_analysis, output_path)
+
+        except Exception as e:
+            logger.error("%s", e)
+            logger.error("%s", input_path)
+            continue
 
 
 if __name__ == "__main__":

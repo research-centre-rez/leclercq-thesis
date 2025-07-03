@@ -3,13 +3,11 @@ import logging
 import os
 import sys
 import csv
+import re
 
 from image_evaluation import (
     NGLV,
     BrennerMethod,
-    AbsoluteGradient,
-    Tenengrad,
-    VarianceOfLaplacian,
 )
 from tqdm import tqdm
 from utils import pprint
@@ -63,24 +61,19 @@ def main(args):
 
     nglv = NGLV()
     brenner = BrennerMethod()
-    abs_grad = AbsoluteGradient()
-    tenengrad = Tenengrad()
-    var_of_lap = VarianceOfLaplacian()
 
     for filename in tqdm(args.input, desc="Evaluating images"):
 
-        nglv_score = round(nglv.calculate_metric(img_path=filename), 4)
-        brenner_score = round(brenner.calculate_metric(img_path=filename), 4)
-        abs_gradient_score = round(abs_grad.calculate_metric(img_path=filename), 4)
-        tenengrad_score = round(tenengrad.calculate_metric(img_path=filename), 4)
-        var_of_lap_score = round(var_of_lap.calculate_metric(img_path=filename), 4)
+        nglv_score = round(nglv.calculate_metric(img_path=filename, normalise=True), 4)
+        brenner_score = round(brenner.calculate_metric(img_path=filename, normalise=True), 4)
 
         _, name = os.path.split(filename)
         base, _ = os.path.splitext(name)
 
         base_split = base.split("_")
 
-        sample_name = base
+        sample_name = base_split[0]
+        sample_name = re.sub(r'[-_]part\d+$', ' ', sample_name)
         fuse_type = base_split[-1]
 
         if fuse_type == "MAX":
@@ -89,9 +82,6 @@ def main(args):
                     sample_name,
                     nglv_score,
                     brenner_score,
-                    abs_gradient_score,
-                    tenengrad_score,
-                    var_of_lap_score,
                 ]
             )
         elif fuse_type == "MIN":
@@ -100,9 +90,6 @@ def main(args):
                     sample_name,
                     nglv_score,
                     brenner_score,
-                    abs_gradient_score,
-                    tenengrad_score,
-                    var_of_lap_score,
                 ]
             )
         elif fuse_type == "VAR":
@@ -111,9 +98,6 @@ def main(args):
                     sample_name,
                     nglv_score,
                     brenner_score,
-                    abs_gradient_score,
-                    tenengrad_score,
-                    var_of_lap_score,
                 ]
             )
         elif fuse_type == "MEAN":
@@ -122,9 +106,6 @@ def main(args):
                     sample_name,
                     nglv_score,
                     brenner_score,
-                    abs_gradient_score,
-                    tenengrad_score,
-                    var_of_lap_score,
                 ]
             )
 
@@ -144,9 +125,6 @@ def main(args):
         "Sample name",
         "NGLV",
         "Brenner",
-        "Absolute Gradient",
-        "Tenengrad",
-        "Variance of Laplacian",
     ]
 
     logger.info("Storing evaluation for max images into the file %s", out_filename_max)
@@ -154,9 +132,6 @@ def main(args):
 
     logger.info("Storing evaluation for min images into the file %s", out_filename_min)
     write_scores_to_csv(out_filename_min, columns, min_scores)
-
-    logger.info("Storing evaluation for min images into the file %s", out_filename_var)
-    write_scores_to_csv(out_filename_var, columns, var_scores)
 
     logger.info("Storing evaluation for min images into the file %s", out_filename_mean)
     write_scores_to_csv(out_filename_mean, columns, mean_scores)
