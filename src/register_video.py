@@ -1,13 +1,12 @@
 import os
-import json
 import sys
-import json5
 import jsonschema
 import argparse
 import logging
 
-from utils import pprint
+from utils import pprint, load_config, load_json_schema
 from utils.filename_builder import append_file_extension, create_out_filename
+
 from video_registration import RegMethod, VideoRegistrator
 
 
@@ -25,7 +24,7 @@ def parse_args():
     required.add_argument(
         "-i",
         "--input",
-        nargs='+',
+        nargs="+",
         type=str,
         required=True,
         help="Relative (or absolute) path to the video you want to register. Example: --i ../data/1/1-part0_processed.mp4",
@@ -66,16 +65,6 @@ def parse_args():
     return argparser.parse_args()
 
 
-def load_config(path):
-    with open(path, "r") as f:
-        return json5.load(f)
-
-
-def load_json_schema(path):
-    with open(path, "r") as f:
-        return json.load(f)
-
-
 def main(args):
     logging.basicConfig(
         level=logging.INFO, format="%(levelname)s:%(name)s: %(message)s"
@@ -97,7 +86,9 @@ def main(args):
     logger.addHandler(fh)
     pprint.log_argparse(args)
 
-    CONFIG_SCHEMA = load_json_schema("./video_registration/video_registration_schema.json")
+    CONFIG_SCHEMA = load_json_schema(
+        "./video_registration/video_registration_schema.json"
+    )
     try:
         config = load_config(args.config)
         jsonschema.validate(instance=config, schema=CONFIG_SCHEMA)
@@ -114,7 +105,9 @@ def main(args):
     for input_path in args.input:
         if args.output in ["auto", "automatic"]:
             base, _ = os.path.splitext(input_path)
-            output_path = create_out_filename(base, [], ["registered", "stack", args.method.name])
+            output_path = create_out_filename(
+                base, [], ["registered", "stack", args.method.name]
+            )
         else:
             output_path = args.output
 

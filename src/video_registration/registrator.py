@@ -221,7 +221,7 @@ class VideoRegistrator:
             _homography_config["method"] = getattr(cv, _homography_config["method"])
 
         # Parse the video in a matrix
-        vid_stack = create_video_matrix(input_video, grayscale=True, max_gb_memory=5)
+        vid_stack = create_video_matrix(input_video, grayscale=True, max_gb_memory=8)
         if vid_stack.size == 0:
             sys.exit()
 

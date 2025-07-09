@@ -4,46 +4,80 @@ import os
 import sys
 import csv
 import re
+from collections import defaultdict
+from datetime import datetime
 
 from image_evaluation import (
     NGLV,
     BrennerMethod,
 )
 from tqdm import tqdm
+from image_evaluation.metrics import normType
 from utils import pprint
 from utils.filename_builder import append_file_extension, create_out_filename
 
 
 def parse_args():
-    argparser = argparse.ArgumentParser(
-        description="Program for evaluating the quality of a fused image stack",
+    parser = argparse.ArgumentParser(
+        description=(
+            "Evaluate fused images using NGLV and Brenner metrics. "
+            "Creates separate CSV files per fusion method (MAX, MIN, VAR, MEAN)."
+            "We assume that fused images were created with fuse_video_stack.py"
+        ),
         formatter_class=argparse.RawTextHelpFormatter,
     )
 
-    required = argparser.add_argument_group("required arguments")
+    required = parser.add_argument_group("required arguments")
 
     required.add_argument(
-        "-i", "--input", type=str, nargs="+", required=True, help="TODO"
+        "-i",
+        "--input",
+        type=str,
+        nargs="+",
+        required=True,
+        help="Paths to fused image(s). Example: -i ../data/images/*.png",
     )
-
-    required.add_argument("-o", "--output", type=str, required=True, help="TODO")
-
     required.add_argument(
-        "-m",
-        "--method",
+        "-o",
+        "--output",
         type=str,
         required=True,
-        help="Which method was used for registration?",
+        help="Base name of the output CSV files (fusion type is auto-appended). If you pass in 'auto' then the program will automatically create an output filename.",
     )
-    return argparser.parse_args()
+    required.add_argument(
+        "-n",
+        "--normalisation_type",
+        type=str,
+        required=True,
+        choices=["std", "minmax", "equalHist", "l2", "grad_mag"],
+        help=(
+            "What image normalisation type would you like to use? The options are:"
+            "std: (image - mean(image)) / (std(image))"
+            "minmax: (image - image.min) / (image.max - image.min)"
+            "equalHist: cv.equalizeHist(image)"
+            "l2: image - (np.linalg.norm(image) + 1e-8)"
+            "grad_mag: gradient normalisation with the use of Sobel filters"
+        ),
+    )
+    return parser.parse_args()
 
 
 def write_scores_to_csv(csv_filename, columns: list[str], data: list):
     with open(csv_filename, "w") as f:
         csv_writer = csv.writer(f)
         csv_writer.writerow(columns)
-        for line in data:
-            csv_writer.writerow(line)
+        csv_writer.writerows(data)
+
+
+def extract_sample_and_fuse_type(filename):
+    name = os.path.basename(filename)
+    base, _ = os.path.splitext(name)
+    base_split = base.split("_")
+
+    sample_name = re.sub(r"[-_]part\d+$", " ", base_split[0])
+    fuse_type = base_split[-1].upper()
+
+    return sample_name, fuse_type
 
 
 def main(args):
@@ -54,87 +88,52 @@ def main(args):
     logger = logging.getLogger(__name__)
     pprint.log_argparse(args)
 
-    min_scores = []
-    max_scores = []
-    var_scores = []
-    mean_scores = []
+    metric_functions = {"NGLV": NGLV(), "Brenner": BrennerMethod()}
 
-    nglv = NGLV()
-    brenner = BrennerMethod()
+    results = defaultdict(list)
+    valid_fuse_types = ["MAX", "MIN", "VAR", "MEAN"]
+    normalisation_type = normType[args.normalisation_type]
 
-    for filename in tqdm(args.input, desc="Evaluating images"):
+    # Store the file as date-month_hour-minute-second_evaluation
+    if args.output.lower() == "auto":
 
-        nglv_score = round(nglv.calculate_metric(img_path=filename, normalise=True), 4)
-        brenner_score = round(brenner.calculate_metric(img_path=filename, normalise=True), 4)
+        timestamp = datetime.now().strftime("%d-%m_%H-%M-%S")
+        args.output = f"./evaluation_runs/{timestamp}_evaluation"
+        os.makedirs(os.path.dirname(args.output), exist_ok=True)
 
-        _, name = os.path.split(filename)
-        base, _ = os.path.splitext(name)
+    for filename in tqdm(args.input, desc="Evaluating image"):
+        sample_name, fuse_type = extract_sample_and_fuse_type(filename)
 
-        base_split = base.split("_")
+        if fuse_type not in valid_fuse_types:
+            logger.warning("Skipping unknown fusion type: %s", fuse_type)
 
-        sample_name = base_split[0]
-        sample_name = re.sub(r'[-_]part\d+$', ' ', sample_name)
-        fuse_type = base_split[-1]
+        nglv_score = round(
+            metric_functions["NGLV"].calculate_metric(
+                filename, normalise=True, normalisationType=normalisation_type
+            ),
+            4,
+        )
+        brenner_score = round(
+            metric_functions["Brenner"].calculate_metric(
+                filename, normalise=True, normalisationType=normalisation_type
+            ),
+            4,
+        )
 
-        if fuse_type == "MAX":
-            max_scores.append(
-                [
-                    sample_name,
-                    nglv_score,
-                    brenner_score,
-                ]
-            )
-        elif fuse_type == "MIN":
-            min_scores.append(
-                [
-                    sample_name,
-                    nglv_score,
-                    brenner_score,
-                ]
-            )
-        elif fuse_type == "VAR":
-            var_scores.append(
-                [
-                    sample_name,
-                    nglv_score,
-                    brenner_score,
-                ]
-            )
-        elif fuse_type == "MEAN":
-            mean_scores.append(
-                [
-                    sample_name,
-                    nglv_score,
-                    brenner_score,
-                ]
-            )
+        results[fuse_type].append([sample_name, nglv_score, brenner_score])
 
-    out_filename_max = create_out_filename(args.output, [], [args.method, "max"])
-    out_filename_max = append_file_extension(out_filename_max, "csv")
+    columns = ["Sample name", "NGLV", "Brenner"]
+    base_output, _ = os.path.splitext(args.output)
+    for fuse_type in sorted(valid_fuse_types):
+        score_data = results[fuse_type]
+        if not score_data:
+            continue
 
-    out_filename_min = create_out_filename(args.output, [], [args.method, "min"])
-    out_filename_min = append_file_extension(out_filename_min, "csv")
+        out_filename = create_out_filename(base_output, [], [fuse_type])
+        out_filename = append_file_extension(out_filename, "csv")
 
-    out_filename_mean = create_out_filename(args.output, [], [args.method, "mean"])
-    out_filename_mean = append_file_extension(out_filename_mean, "csv")
-
-    out_filename_var = create_out_filename(args.output, [], [args.method, "var"])
-    out_filename_var = append_file_extension(out_filename_var, "csv")
-
-    columns = [
-        "Sample name",
-        "NGLV",
-        "Brenner",
-    ]
-
-    logger.info("Storing evaluation for max images into the file %s", out_filename_max)
-    write_scores_to_csv(out_filename_max, columns, max_scores)
-
-    logger.info("Storing evaluation for min images into the file %s", out_filename_min)
-    write_scores_to_csv(out_filename_min, columns, min_scores)
-
-    logger.info("Storing evaluation for min images into the file %s", out_filename_mean)
-    write_scores_to_csv(out_filename_mean, columns, mean_scores)
+        logger.info("Storing evaluation for %s images into %s", fuse_type, out_filename)
+        write_scores_to_csv(out_filename, columns, score_data)
 
 
 if __name__ == "__main__":
