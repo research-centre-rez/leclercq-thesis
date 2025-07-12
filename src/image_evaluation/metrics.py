@@ -1,15 +1,13 @@
 from enum import Enum, auto
+import sys
 from typing import Union
 import numpy as np
 import cv2 as cv
 
 
 class normType(Enum):
-    std = auto()
-    minmax = auto()
-    equalHist = auto()
-    l2 = auto()
     grad_mag = auto()
+    l1_norm = auto()
 
 
 class Metric:
@@ -28,35 +26,21 @@ class Metric:
         Arguments:
             image (np.ndarray): image to be normalised
             normType (normType): Type of the normalisation to be applied. Can be one of the following:
-                `std`: (image - mean(image)) / (std(image))
-                `minmax`: (image - image.min) / (image.max - image.min)
-                `equalHist`: cv.equalizeHist(image)
-                `l2`: image - (np.linalg.norm(image) + 1e-8)
+                `l1_norm`: image / np.sum(image)
                 `grad_mag`: gradient normalisation with the use of Sobel filters
         Returns:
             Normalised image
         """
         image = image.astype(np.float64)
 
-        if normalisationType == normType.std:
-            return (image - np.mean(image)) / (np.std(image + 1e-8))
-
-        if normalisationType == normType.minmax:
-            return (image - image.min()) / (image.max() - image.min() + 1e-8)
-
-        if normalisationType == normType.equalHist:
-            return cv.equalizeHist(image.astype(np.uint8))
-
-        if normalisationType == normType.l2:
-            return image - (np.linalg.norm(image) + 1e-8)
+        if normalisationType == normType.l1_norm:
+            return image / np.sum(image) * image.size
 
         if normalisationType == normType.grad_mag:
             gx = cv.Sobel(image, cv.CV_64F, 1, 0, ksize=3)
             gy = cv.Sobel(image, cv.CV_64F, 0, 1, ksize=3)
             grad_mag = np.sqrt(gx**2 + gy**2)
-            grad_mag /= grad_mag.max() + 1e-8
             return grad_mag
-        raise ValueError("Invalid norm type given.")
 
     def _mask_sample(self, img: np.ndarray) -> np.ndarray:
         """
@@ -74,19 +58,13 @@ class Metric:
         masked_img = cv.bitwise_and(img, img, mask=mask)
         return masked_img
 
-    def _load_img_to_memory(self, img_path: str, use_float: bool) -> np.ndarray:
+    def _load_img_to_memory(self, img_path: str) -> np.ndarray:
         """
         Utility funtion that load the image into memory.
         Args:
             img_path (str): Relative path to the image file
-            use_float (bool): Convert the uint8 image into float
         """
         image = cv.imread(img_path, cv.IMREAD_GRAYSCALE)
-
-        if use_float:
-            image = self._mask_sample(image)
-            image = self._normalise_img(image, normType.grad_mag)
-            return image
 
         return self._mask_sample(image)
 
@@ -94,7 +72,7 @@ class Metric:
         self,
         img_path: Union[str, np.ndarray],
         normalise: bool,
-        normalisationType: normType,
+        normalisationType: Union[None, normType],
     ) -> np.ndarray:
         """
         Wrapper for pre-processing the fused image. Normalises the image if required and the user can specify the normalisation they wish to apply.
@@ -104,24 +82,26 @@ class Metric:
             normType (normType): What kind of normalisation you wish to apply.
 
         Returns:
-            Loaded image
+            Preprocessed image
         """
         if isinstance(img_path, str):
 
-            image = self._load_img_to_memory(img_path, use_float=True)
-            if normalise:
-                return self._normalise_img(image, normalisationType)
+            image = self._load_img_to_memory(img_path)
+
             if image.dtype == np.uint8:
                 image = image.astype(np.float64) / 255.0
-                return image
+            if normalise and normalisationType is not None:
+                image = self._normalise_img(image, normalisationType)
+
+            return image
 
         if isinstance(img_path, np.ndarray):
             image = self._mask_sample(img_path)
-            if normalise:
-                image = self._normalise_img(image, normalisationType)
-
             if image.dtype == np.uint8:
                 image = image.astype(np.float64) / 255.0
+            if normalise and normalisationType is not None:
+                image = self._normalise_img(image, normalisationType)
+
             return image
 
 

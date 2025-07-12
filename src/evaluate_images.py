@@ -17,12 +17,18 @@ from utils import pprint
 from utils.filename_builder import append_file_extension, create_out_filename
 
 
+logger = logging.getLogger(__name__)
+
+
 def parse_args():
     parser = argparse.ArgumentParser(
         description=(
-            "Evaluate fused images using NGLV and Brenner metrics. "
-            "Creates separate CSV files per fusion method (MAX, MIN, VAR, MEAN)."
-            "We assume that fused images were created with fuse_video_stack.py"
+            "Evaluate fused images using two sharpness metrics:\n"
+            "- NGLV (Normalized Grey-Level Variance): std_dev^2 / mean, reflects local contrast.\n"
+            "- Brenner: sum of squared intensity differences over 2-pixel steps, normalized by image size.\n"
+            "Generates separate CSVs per fusion method (MAX, MIN, VAR, MEAN).\n"
+            "NOTE: Assumes fused images follow the naming conventions of fuse_video_stack.py.\n"
+            "NOTE: Assumes that the registered video stacks follow this naming convention: {sample name}_processing_params.npy"
         ),
         formatter_class=argparse.RawTextHelpFormatter,
     )
@@ -42,21 +48,19 @@ def parse_args():
         "--output",
         type=str,
         required=True,
-        help="Base name of the output CSV files (fusion type is auto-appended). If you pass in 'auto' then the program will automatically create an output filename.",
+        help=(
+            "Where do you want to save the output CSV files (fusion type is auto-appended). If you pass in 'auto' then the program will automatically create an output filename. The file created with auto will have the following name structure: dd-mm_h-m-s_evaluation_{type_of_eval} and will be stored in './evaluation_runs'"
+            "Example: --o auto -> ./evaluation_runs/12-07_09-58_evaluation_MAX.csv"
+        ),
     )
     required.add_argument(
         "-n",
         "--normalisation_type",
         type=str,
         required=True,
-        choices=["std", "minmax", "equalHist", "l2", "grad_mag"],
+        choices=["l1_norm", "grad_mag"],
         help=(
-            "What image normalisation type would you like to use? The options are:"
-            "std: (image - mean(image)) / (std(image))"
-            "minmax: (image - image.min) / (image.max - image.min)"
-            "equalHist: cv.equalizeHist(image)"
-            "l2: image - (np.linalg.norm(image) + 1e-8)"
-            "grad_mag: gradient normalisation with the use of Sobel filters"
+            "What normalisation do you want to apply to the fused images? The options are 'l1_norm' which applies L1 normalisation and 'grad_mag' which applies gradient magnitude normalisation."
         ),
     )
     return parser.parse_args()
@@ -69,13 +73,31 @@ def write_scores_to_csv(csv_filename, columns: list[str], data: list):
         csv_writer.writerows(data)
 
 
-def extract_sample_and_fuse_type(filename):
+def extract_sample_and_fuse_type(
+    filename: str, valid_fuse_types: list[str], strip_filename: bool = True
+):
+    """
+    Extracts the sample's name and the fuse type out of the fused image. We assume that the fused image was generated with our `fuse_video_stack.py` and therefore we can remove a lot of useless information for the csv table. If you are passing a filename that was generated differently, use the `strip_filename=False` flag to skip this step.
+    Arguments:
+        `filename` (str): Name of the fused image you want to extract the sample name and fuse_type from
+        `valid_fuse_types` (list[str]): List of all valid fuse types
+        `strip_filename` (bool): Automatic removal of useless information from the filename, if you did not use `fuse_video_stack.py` to generate the fused image automatically then set this to False
+    Returns:
+        (sample_name, fuse_type), if not able to identify the fuse_type it is set as 'UNKNOWN'
+    """
     name = os.path.basename(filename)
     base, _ = os.path.splitext(name)
     base_split = base.split("_")
 
-    sample_name = re.sub(r"[-_]part\d+$", " ", base_split[0])
-    fuse_type = base_split[-1].upper()
+    if strip_filename:
+        sample_name = re.sub(r"[-_]part\d+$", " ", base_split[0])
+        fuse_type = base_split[-1].upper()
+        if fuse_type not in valid_fuse_types:
+            fuse_type = "UNKNOWN"
+
+    else:
+        sample_name = base_split
+        fuse_type = "UNKNOWN"
 
     return sample_name, fuse_type
 
@@ -85,13 +107,12 @@ def main(args):
         level=logging.INFO, format="%(levelname)s:%(name)s: %(message)s"
     )
 
-    logger = logging.getLogger(__name__)
     pprint.log_argparse(args)
 
     metric_functions = {"NGLV": NGLV(), "Brenner": BrennerMethod()}
 
     results = defaultdict(list)
-    valid_fuse_types = ["MAX", "MIN", "VAR", "MEAN"]
+    valid_fuse_types = ["MAX", "MIN", "VAR", "MEAN", "unknown"]
     normalisation_type = normType[args.normalisation_type]
 
     # Store the file as date-month_hour-minute-second_evaluation
@@ -99,7 +120,9 @@ def main(args):
 
         timestamp = datetime.now().strftime("%d-%m_%H-%M-%S")
         args.output = f"./evaluation_runs/{timestamp}_evaluation"
-        os.makedirs(os.path.dirname(args.output), exist_ok=True)
+
+    # Create all of the required directories for the output file
+    os.makedirs(os.path.dirname(args.output), exist_ok=True)
 
     for filename in tqdm(args.input, desc="Evaluating image"):
         sample_name, fuse_type = extract_sample_and_fuse_type(filename)

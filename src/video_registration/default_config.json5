@@ -33,7 +33,7 @@
     // Parameters for LightGlue
     matcher:{
       // Number of stacked self+cross attention layers. Reduce for faster inference at cost of accuracy
-      n_layers: 10,
+      n_layers: 9,
       // Enable FlashAttention. Increases speed and reduces memory consumption without impact of accuracy
       flash: true,
       // Enable mixed precision inference, which means using different numerical precisions within the network (16 and 32 bit floats used together). Default is False = off. 
@@ -45,7 +45,7 @@
       // Disable with -1
       width_confidence: -1,
       // Match confidence, Increase this value to obtain less, but stronger matches
-      filter_threshold: 0.1
+      filter_threshold: 0.2
     },
     // These are the parameters for estimating homography between 2 sets of keypoints.
     homography: {
@@ -70,9 +70,9 @@
       // Maximum number of features to retain
       nfeatures: 3000,
       // Pyramid decimation ratio, greater than 1. scaleFactor==2 means that each next level will have 4x less pixels than the previous.
-      scaleFactor: 1.2,
+      scaleFactor: 1.4,
       // The number of pyramid levels. The smallest level will have linear size equal to input_image_size/pow(scaleFactor, nlevels - firstLevel)
-      nlevels: 6,
+      nlevels: 3,
       // Size of the border where the features are not detected. Should roughly match the patchSize parameter
       edgeThreshold: 31,
       // The level of pyramid to put source image to. Previous layers are filled with upscaled src image
@@ -106,7 +106,7 @@
     // How often the reference image should be updated
     update_every_frame: 5,
     // Maximum distance allowed between matches
-    max_match_distance: 7,
+    max_match_distance: 8,
     // Parameters for the matcher
     matcher: {
       // Which norm is being used, NORM_HAMMING when WTA_K = 2, NORM_HAMMING when WTA_K >= 3
