@@ -9,9 +9,8 @@ import numpy as np
 import cv2 as cv
 from cv2 import ORB
 import muDIC as dic
-from LightGlue.lightglue.utils import Extractor
-from LightGlue.lightglue import LightGlue, SuperPoint, DISK, SIFT, ALIKED, DoGHardNet
-from LightGlue.lightglue.utils import numpy_image_to_torch
+from lightglue.utils import Extractor, numpy_image_to_torch
+from lightglue import LightGlue, SuperPoint, DISK, SIFT, ALIKED, DoGHardNet
 import torch
 import torch.nn.functional as F
 
