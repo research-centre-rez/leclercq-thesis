@@ -5,7 +5,6 @@ import os
 from typing import Union
 import numpy as np
 import cv2 as cv
-from welford import Welford
 
 from utils import pprint
 from utils.filename_builder import append_file_extension, create_out_filename
