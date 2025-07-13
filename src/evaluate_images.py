@@ -125,7 +125,7 @@ def main(args):
     os.makedirs(os.path.dirname(args.output), exist_ok=True)
 
     for filename in tqdm(args.input, desc="Evaluating image"):
-        sample_name, fuse_type = extract_sample_and_fuse_type(filename)
+        sample_name, fuse_type = extract_sample_and_fuse_type(filename, valid_fuse_types)
 
         if fuse_type not in valid_fuse_types:
             logger.warning("Skipping unknown fusion type: %s", fuse_type)

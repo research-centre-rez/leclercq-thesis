@@ -45,7 +45,7 @@
       // Disable with -1
       width_confidence: -1,
       // Match confidence, Increase this value to obtain less, but stronger matches
-      filter_threshold: 0.2
+      filter_threshold: 0.1
     },
     // These are the parameters for estimating homography between 2 sets of keypoints.
     homography: {

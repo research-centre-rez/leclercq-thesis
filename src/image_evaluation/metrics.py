@@ -3,6 +3,7 @@ import sys
 from typing import Union
 import numpy as np
 import cv2 as cv
+import matplotlib.pyplot as plt
 
 
 class normType(Enum):
@@ -87,6 +88,8 @@ class Metric:
         if isinstance(img_path, str):
 
             image = self._load_img_to_memory(img_path)
+            image = self._mask_sample(image)
+
 
             if image.dtype == np.uint8:
                 image = image.astype(np.float64) / 255.0
@@ -117,7 +120,12 @@ class NGLV(Metric):
         normalisationType: normType,
     ) -> np.ndarray:
 
+
         image = self._preprocess_image(img_path, normalise, normalisationType)
+#        plt.imshow(image, cmap='gray')
+#        plt.show()
+#        print(image.max())
+#        sys.exit()
 
         mean, std_dev = cv.meanStdDev(image)
         result = std_dev[0] ** 2 / mean[0]
@@ -203,17 +211,17 @@ class MutualInformation(Metric):
     ):
         stack = self._load_video_stack(img_path, normalise)
 
-        mean_image = np.mean(stack, axis=0)
+        mean_image = np.max(stack, axis=0)
 
-        mean_image = self._normalise_img(mean_image, normType.grad_mag)
+        #mean_image = self._normalise_img(mean_image, normType.l1_norm)
 
         mi_scores = [
             self._mutual_information(
-                self._normalise_img(img, normType.grad_mag), mean_image
+                img, mean_image
             )
             for img in stack
         ]
-        mean_score = np.mean(mi_scores)
+        mean_score = np.percentile(mi_scores, 1)
         std_score = np.std(mi_scores)
         return mean_score, std_score
 
