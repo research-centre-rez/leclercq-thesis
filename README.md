@@ -15,6 +15,7 @@ git submodule update --init
 python3.11 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
+jupytext src/demo.py --to ipynb
 ```
 
 This should install everything that is required. The dataset can be downloaded with the following:
