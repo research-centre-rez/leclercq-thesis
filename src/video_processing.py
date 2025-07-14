@@ -1,14 +1,12 @@
 import os
 import sys
-import json
-import json5
 import argparse
 import logging
 
 import jsonschema
 from jsonschema.exceptions import ValidationError
 
-from utils import pprint
+from utils import pprint, load_json_schema, load_config
 from utils.filename_builder import append_file_extension, create_out_filename
 from video_processing import VideoProcessor
 from video_processing import ProcessorMethod
@@ -66,16 +64,6 @@ def parse_args():
     return argparser.parse_args()
 
 
-def load_config(path):
-    with open(path, "r") as f:
-        return json5.load(f)
-
-
-def load_json_schema(path):
-    with open(path, "r") as f:
-        return json.load(f)
-
-
 def main(args):
     logging.basicConfig(
         level=logging.INFO, format="%(levelname)s:%(name)s: %(message)s"
@@ -102,7 +90,6 @@ def main(args):
             output_path = append_file_extension(save_as, "mp4")
         else:
             output_path = args.output
-
 
         logger.info("Processing %s -> %s", input_path, output_path)
         analysis = proc.get_rotation_analysis(input_path)

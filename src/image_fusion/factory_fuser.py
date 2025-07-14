@@ -5,7 +5,6 @@ import os
 from typing import Union
 import numpy as np
 import cv2 as cv
-from welford import Welford
 
 from utils import pprint
 from utils.filename_builder import append_file_extension, create_out_filename
@@ -124,6 +123,19 @@ class MaxFuser(Fuser):
         self._log_activity()
         return verified_stack.max(axis=0)
 
+    def get_fused_image_(self, video_stack: Union[str, np.ndarray]) -> np.ndarray:
+        verified_stack = self._verify_video_stack(video_stack)
+        self._log_activity()
+
+        fused = verified_stack.max(axis=0)
+
+        # Compute mean intensity of the whole stack and of the fused image
+        stack_mean = verified_stack.mean()
+        fused_mean = fused.mean()
+
+        # Scale fused image to match original stack brightness
+        scale = stack_mean / (fused_mean + 1e-8)  # avoid division by zero
+        return np.clip(fused * scale, 0, 255).astype(verified_stack.dtype)
 
 class MeanFuser(Fuser):
     """

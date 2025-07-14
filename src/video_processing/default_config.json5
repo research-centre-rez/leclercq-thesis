@@ -10,8 +10,9 @@
     By how much should the video be scaled down in size
     NOTE:
       If the source video is in 4k, then for some mystical reasons opencv is not able to write out a 4k video
-      I have spent quite some long time on figuring out why and I haven't been able to figure it out 
-      The resulting video is a valid .mp4 video but it will literally crash my computer*/
+      that VLC would be able to open and show the user. I have spent quite some long time on figuring out why
+      and I haven't been able to figure it out. The resulting video is a valid .mp4 video but it will
+      literally crash my computer.*/
   downscale_factor: 2,
   // Turn the resulting video into grayscale
   grayscale: true,

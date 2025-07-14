@@ -9,9 +9,8 @@ import numpy as np
 import cv2 as cv
 from cv2 import ORB
 import muDIC as dic
-from LightGlue.lightglue.utils import Extractor
+from lightglue.utils import Extractor, numpy_image_to_torch
 from lightglue import LightGlue, SuperPoint, DISK, SIFT, ALIKED, DoGHardNet
-from lightglue.utils import numpy_image_to_torch
 import torch
 import torch.nn.functional as F
 
@@ -221,7 +220,7 @@ class VideoRegistrator:
             _homography_config["method"] = getattr(cv, _homography_config["method"])
 
         # Parse the video in a matrix
-        vid_stack = create_video_matrix(input_video, grayscale=True, max_gb_memory=5)
+        vid_stack = create_video_matrix(input_video, grayscale=True, max_gb_memory=8)
         if vid_stack.size == 0:
             sys.exit()
 
@@ -329,7 +328,7 @@ class VideoRegistrator:
         n, h, w = image_stack.shape
 
         x_c, y_c = self._fit_ellipse(displacement)
-        transformations = [np.eye(2, 3)]
+        transformations = [np.eye(3, 3)]
 
         for i in tqdm(range(n), desc="Registering by shift"):
             image = image_stack[i]
