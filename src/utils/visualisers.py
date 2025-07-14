@@ -56,12 +56,10 @@ def imshow(title= None, **images) -> None:
         if name == 'image':
             ax.imshow(image.permute(1,2,0))
         else:
-            ax.imshow(image)
+            ax.imshow(image, cmap="gray")
 
     for ax in axes[len(images):]:
         ax.axis('off')
-
-    plt.savefig('result' if title is None else title, bbox_inches='tight', dpi=400)
 
     plt.show()
     plt.pause(0.1)

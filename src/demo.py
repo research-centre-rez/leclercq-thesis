@@ -47,19 +47,31 @@ from image_evaluation import NGLV, BrennerMethod
 from evaluate_images import write_scores_to_csv
 
 from image_evaluation.metrics import normType
+from utils.visualisers import imshow
+
 
 # %%
-logging.basicConfig(level=logging.INFO, format="%(levelname)s:%(name)s: %(message)s")
+# Utility function for validating a JSON schema
+def validate_json_config(config, json_schema):
+    # Load the config and validate it against the json schema
+    try:
+        jsonschema.validate(instance=config, schema=json_schema)
+        pprint.pprint_dict(config, desc="Config parameters")
+    except ValidationError as e:
+        sys.exit(-1)
+    return config
 
-logger = logging.getLogger(__name__)
 
 # %% [markdown]
 # ## Step 1: Split video
 # Specify the path of the video we are interested in splitting and where we want to save the split videos.
 
 # %%
-video_path = '../data-backup/3A.MP4'
-out_split_path = '../split-videos/'
+# Relative path to the video you wish to process, as an example we take the following
+video_path = os.path.join('..', 'concrete-samples', '3A.MP4')
+
+# Where would you like to save the split videos? You only need to specify the output directory
+out_split_path = os.path.join('..', 'split-videos', '')
 
 # %%
 _split_video(vid_path=video_path, out_path=out_split_path)
@@ -68,30 +80,29 @@ _split_video(vid_path=video_path, out_path=out_split_path)
 # # Step 2: Downsampling and rotation correction
 
 # %%
-vid_processing_schema = load_json_schema('./video_processing/video_processing_schema.json')
+# Schema used for validating the input config file
+video_processing_schema = load_json_schema(os.path.join('.', 'video_processing', 'video_processing_schema.json'))
 
-# We select the video with the side angle illumination for the rotation correction
-processing_input_filename = '../split-videos/3A/3A_part0.mp4'
-out_filename = "../split-videos/3A/3A_part0_processed.mp4"
+# Video processing config
+video_processing_config = load_config(os.path.join('.', 'video_processing', 'default_config.json5'))
 
-# Load the config and validate it against the json schema
-try:
-    video_processing_config = load_config('./video_processing/default_config.json5')
-    jsonschema.validate(instance=video_processing_config, schema=vid_processing_schema)
-    logger.info("Successfully loaded a JSON schema")
-    pprint.pprint_dict(video_processing_config, desc="Config parameters")
-except ValidationError as e:
-    logger.error("Invalid configuration: \n %s", e.message)
-    sys.exit(-1)
+# Name of the split video file you want to process
+processing_input_filename = os.path.join('..', 'split-videos', '3A', '3A_part0.mp4')
 
+# Specify how you want to name the processed video
+# Note: name should not be the same as the input video
+save_processed_video_as = os.path.join('..', 'split-videos', '3A', '3A_part0_processed.mp4')
+
+# %%
+validated_video_processing_config = validate_json_config(video_processing_config, video_processing_schema)
 # Instantiate the video processor class
-proc = VideoProcessor(method=ProcessorMethod.OPT_FLOW, config=video_processing_config)
+proc = VideoProcessor(method=ProcessorMethod.OPT_FLOW, config=validated_video_processing_config)
 
-# Extract the analysis of the motion
+# Extract the analysis of the motion of the sample
 analysis = proc.get_rotation_analysis(processing_input_filename)
 
-# Process the video with rotation correction and downsampling parameters.
-proc.write_out_video(processing_input_filename, analysis, out_filename)
+# Write out the video video with rotation correction and downsampling parameters
+proc.write_out_video(processing_input_filename, analysis, save_processed_video_as)
 
 # %% [markdown]
 # ## Step 3: Register the video
@@ -104,38 +115,47 @@ proc.write_out_video(processing_input_filename, analysis, out_filename)
 # For LightGlue registration, a GPU with cuda capabilities is required.
 
 # %%
-reg_config_schema = load_json_schema('./video_registration/video_registration_schema.json')
-reg_config_path = './video_registration/default_config.json5'
+# Schema used for validating the input config file
+video_registration_schema = load_json_schema(os.path.join('.', 'video_registration', 'video_registration_schema.json'))
 
-input_reg_path = out_filename
-save_registered_block_as = '../split-videos/3A/3A_part0_registered'
+# Config file used for video registration
+video_registration_config = load_config(os.path.join('.', 'video_registration', 'default_config.json5'))
 
-try:
-    reg_config = load_config(reg_config_path)
-    jsonschema.validate(instance=reg_config, schema=reg_config_schema)
-    logger.info("Successfully validated the submitted config")
-    pprint.pprint_dict(reg_config, "Config parameters")
-except jsonschema.ValidationError as e:
-    logger.error("Invalid configuration: \n %s", e.message)
-    sys.exit(1)
+# Path to the video you want to register 
+# Note: should be already pre-processed by step 2
+video_registration_input = os.path.join('..', 'split-videos', '3A', '3A_part0_processed.mp4')
+
+# How you want to save the registered block (numpy will automatically append the .npy file extension)
+save_registered_block_as = os.path.join('..', 'split-videos', '3A', '3A_part0_registered')
+
+# %%
+validated_video_registration_config = validate_json_config(video_registration_config, video_registration_schema)
 
 # Choosing a registration method
-method = RegMethod.LIGHTGLUE
+# Options are: LIGHTGLUE, ORB, MUDIC
+# Note: MUDIC is quite slow with the registration
+method = RegMethod.ORB
 
 # Initialising the registrator class
-reg = VideoRegistrator(method=method, config=reg_config)
+reg = VideoRegistrator(method=method, config=validated_video_registration_config)
 
-reg_analysis = reg.get_registered_block(input_reg_path)
+# Returns the registered video stack and the transformations that were used
+reg_analysis = reg.get_registered_block(video_registration_input)
 
+# Saves the registered block and the list of transformations to the specified location
 reg.save_registered_block(reg_analysis, save_registered_block_as)
 
 # %% [markdown]
 # ## Step 4: Image fusion
 
 # %%
-registered_stack_path = '../split-videos/3A/3A_part0_registered.npy'
-save_fused_img_to = '../split-videos/3A/3A_part0_registered_fused.png'
+# Path to the registered video stack
+registered_stack_path = os.path.join('..', 'split-videos', '3A', '3A_part0_registered.npy')
 
+# Specify where you want to save the fused images to
+save_fused_images_to = os.path.join('..', 'split-videos', '3A', '3A_part0_fused.png')
+
+# %%
 fuse_types = [FuseMethod.MIN, FuseMethod.MAX, FuseMethod.MEAN]
 
 fuser_factory = ImageFuserFactory()
@@ -152,18 +172,9 @@ for fuser in fusers:
     fused_image = fuser.get_fused_image(registered_stack_path)
 
     gallery[fuser.method] = crop_image(fused_image, min_mask)
-    fuser.save_image_to_disc(gallery[fuser.method], save_fused_img_to)
+    fuser.save_image_to_disc(gallery[fuser.method], save_fused_images_to)
 
-# Display the gallery
-fig, axes = plt.subplots(1, len(fusers), figsize=(15, 5))
-for ax, fuser in zip(axes, fusers):
-    method = fuser.method
-    ax.imshow(gallery[method], cmap='gray')
-    ax.set_title(str(method))
-    ax.axis('off')
-
-plt.tight_layout()
-plt.show()
+imshow('Gallery of fused images', min_fusion=gallery[FuseMethod.MIN], max_fusion=gallery[FuseMethod.MAX], mean_fusion=gallery[FuseMethod.MEAN])
 
 # %% [markdown]
 # ## Step 5: Evalute the fused images
@@ -171,14 +182,13 @@ plt.show()
 # The last step of our pipeline is to evaluate our fused images. We normalise the mean image so that the scores are all in the same range.
 
 # %%
-
-
 input_paths = [
-    '../split-videos/3A/3A_part0_registered_fused_MAX.png',
-    '../split-videos/3A/3A_part0_registered_fused_MIN.png',
-    '../split-videos/3A/3A_part0_registered_fused_MEAN.png'
+    os.path.join('..', 'split-videos', '3A', '3A_part0_registered_fused_MAX.png'),
+    os.path.join('..', 'split-videos', '3A', '3A_part0_registered_fused_MIN.png'),
+    os.path.join('..', 'split-videos', '3A', '3A_part0_registered_fused_MEAN.png'),
 ]
-output_evaluation_path = '../split-videos/3A/evaluation.csv'
+
+output_evaluation_path = os.path.join('..', 'split-videos', '3A', 'evaluation.csv')
 
 nglv_evaluator = NGLV()
 brenner_evaluator = BrennerMethod()
