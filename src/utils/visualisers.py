@@ -8,7 +8,6 @@ import cv2 as cv
 import numpy as np
 
 from utils.filename_builder import append_file_extension, create_out_filename
-from utils.tqdm_utils import tqdm_generator
 
 # Leclercq's util functions
 
@@ -134,81 +133,6 @@ def plot_optical_flow(trajectories:list[np.ndarray], metrics:dict, graph_config:
         plt.show()
 
     plt.close()
-
-def draw_optical_flow_video(video_path, trajectories, output_path=None):
-    '''
-    Creates a new video with optical flow points drawn on each frame.
-    
-    Args:
-        video_path (str): Path to the original video
-        trajectories (list): List of trajectories from analyse_optical_flow function
-        output_path (str): Path to save the output video. If None, creates based on input filename
-        color (tuple): BGR color for the points (default: green)
-        radius (int): Radius of the circles to draw
-        thickness (int): Thickness of the circle outlines
-        
-    Returns:
-        str: Path to the output video
-    '''
-    # Init logger
-    logger = logging.getLogger(__name__)
-
-    # Create output path if not provided
-    if output_path is None:
-        _, basename = os.path.split(video_path)
-        base, ext = os.path.splitext(basename)
-        output_path = create_out_filename(f'./videos/{base}', [], ['flow_viz']) + ext
-        output_path = append_file_extension(output_path, ext)
-
-    # Open input video
-    cap = cv.VideoCapture(video_path)
-    if not cap.isOpened():
-        logger.error(f'Error: Could not open file {video_path}')
-        return None
-
-    # Get video properties
-    #fps = cap.get(cv.CAP_PROP_FPS)
-    #width = int(cap.get(cv.CAP_PROP_FRAME_WIDTH))
-    #height = int(cap.get(cv.CAP_PROP_FRAME_HEIGHT))
-    fps    = 30
-    width  = 1920
-    height = 1080
-
-    # Create output video writer
-    fourcc = cv.VideoWriter_fourcc(*'mp4v')  # or 'XVID'
-    out = cv.VideoWriter(output_path, fourcc, fps, (width, height))
-
-    frame_idx = 0
-
-    colors = [(np.random.choice(range(256), size=3)).tolist() for _ in range(len(trajectories))]
-
-    # Process each frame
-    for _ in tqdm(tqdm_generator(), desc='Creating flow visualization video'):
-        ret, frame = cap.read()
-        if not ret:
-            break
-
-        new_frame = frame
-
-        # Draw trajectory points for current frame
-        for i, traj in enumerate(trajectories):
-            if frame_idx < len(traj):
-                x, y = int(traj[frame_idx][0]), int(traj[frame_idx][1])
-                cv.circle(new_frame, (x, y), 10, colors[i], -1)
-
-        new_frame = cv.resize(new_frame, (width, height))
-
-        # Write frame to output video
-        out.write(new_frame)
-        frame_idx += 1
-
-    # Release resources
-    out.release()
-    cap.release()
-    cv.destroyAllWindows()
-
-    logger.info(f'Optical flow visualization saved to {output_path}')
-    return output_path
 
 def visualize_rotation_analysis(trajectories, rotation_results, frames=None, graph_config=None):
     """
