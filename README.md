@@ -19,7 +19,7 @@ pip install -r requirements.txt
 
 This should install everything that is required. The dataset can be downloaded with the following:
 > [!WARNING]
-> The whole dataset spans around 50GB of disc space. You can download a single video from the repository's page here: [here.](https://huggingface.co/datasets/research-centre-rez/concrete-samples/blob/main/3A.MP4) 
+> The whole dataset spans around 50GB of disc space. You can download a single video from the repository's page [here.](https://huggingface.co/datasets/research-centre-rez/concrete-samples/blob/main/3A.MP4) 
 
 ```bash
 git clone https://huggingface.co/datasets/research-centre-rez/concrete-samples
