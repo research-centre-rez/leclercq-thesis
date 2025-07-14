@@ -182,7 +182,7 @@ class VideoProcessor:
         graph_config = {
             "save_as": create_out_filename(f'./_images/{base}', [], ["optical", "flow", "analysis"]),
             "sample_name": name,
-            "save": True,
+            "save": False,
             "show": False,
         }
         logger.info("Saving rotation analysis graph")

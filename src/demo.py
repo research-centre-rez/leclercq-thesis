@@ -8,7 +8,7 @@
 #       format_version: '1.3'
 #       jupytext_version: 1.17.2
 #   kernelspec:
-#     display_name: clean-venv
+#     display_name: cooler-venv
 #     language: python
 #     name: python3
 # ---
@@ -183,9 +183,9 @@ imshow('Gallery of fused images', min_fusion=gallery[FuseMethod.MIN], max_fusion
 
 # %%
 input_paths = [
-    os.path.join('..', 'split-videos', '3A', '3A_part0_registered_fused_MAX.png'),
-    os.path.join('..', 'split-videos', '3A', '3A_part0_registered_fused_MIN.png'),
-    os.path.join('..', 'split-videos', '3A', '3A_part0_registered_fused_MEAN.png'),
+    os.path.join('..', 'split-videos', '3A', '3A_part0_fused_MAX.png'),
+    os.path.join('..', 'split-videos', '3A', '3A_part0_fused_MIN.png'),
+    os.path.join('..', 'split-videos', '3A', '3A_part0_fused_MEAN.png'),
 ]
 
 output_evaluation_path = os.path.join('..', 'split-videos', '3A', 'evaluation.csv')
