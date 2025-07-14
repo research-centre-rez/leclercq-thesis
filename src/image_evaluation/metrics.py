@@ -122,10 +122,6 @@ class NGLV(Metric):
 
 
         image = self._preprocess_image(img_path, normalise, normalisationType)
-#        plt.imshow(image, cmap='gray')
-#        plt.show()
-#        print(image.max())
-#        sys.exit()
 
         mean, std_dev = cv.meanStdDev(image)
         result = std_dev[0] ** 2 / mean[0]

@@ -94,20 +94,6 @@ class MinFuser(Fuser):
         self._log_activity()
         return verified_stack.min(axis=0)
 
-    def get_fused_image_(self, video_stack: Union[str, np.ndarray]) -> np.ndarray:
-        verified_stack = self._verify_video_stack(video_stack)
-        self._log_activity()
-
-        fused = verified_stack.min(axis=0)
-
-        # Compute mean intensity of the whole stack and of the fused image
-        stack_mean = verified_stack.mean()
-        fused_mean = fused.mean()
-
-        # Scale fused image to match original stack brightness
-        scale = stack_mean / (fused_mean + 1e-8)  # avoid division by zero
-        return np.clip(fused * scale, 0, 255).astype(verified_stack.dtype)
-
     def get_min_mask(self, video_stack: Union[str, np.ndarray]) -> np.ndarray:
         """
         The min image can be used to create a mask that is centered on the concrete sample.
