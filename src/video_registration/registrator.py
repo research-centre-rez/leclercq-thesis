@@ -16,7 +16,7 @@ import torch.nn.functional as F
 
 from skimage.measure import EllipseModel
 from tqdm import tqdm
-from mudic_utils import extract_medians
+from .mudic_utils import extract_medians
 from utils.filename_builder import append_file_extension, create_out_filename
 from utils.prep_cap import prep_cap
 
