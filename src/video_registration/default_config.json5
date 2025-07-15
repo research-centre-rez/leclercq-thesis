@@ -68,7 +68,7 @@
   ORB_parameters: {
     init_params: {
       // Maximum number of features to retain
-      nfeatures: 3000,
+      nfeatures: 4000,
       // Pyramid decimation ratio, greater than 1. scaleFactor==2 means that each next level will have 4x less pixels than the previous.
       scaleFactor: 1.4,
       // The number of pyramid levels. The smallest level will have linear size equal to input_image_size/pow(scaleFactor, nlevels - firstLevel)
