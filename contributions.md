@@ -29,7 +29,7 @@ Below is a comprehensive list of the dependencies for this repository:
 
 ## Benchmarks
 
-Are presented in the original thesis. However they can be recreated by registering all of the videos in `concrete-samples` with the default config files and then evaluating them with the `image_evaluation` module.
+Are presented in the original thesis. However they can be recreated by registering all of the videos in `concrete-samples` with the default config files and then evaluating them with the `image_evaluation` module. [Link to thesis in SIS.](https://is.cuni.cz/studium/dipl_st/index.php?id=&tid=&do=main&doo=detail&did=282804) 
 
 ## Planned improvements
 

@@ -37,8 +37,9 @@ Structure of the pipeline is described in `src/README.md`
 - Python 3.11
 - GPU with `cuda` support
 - (optional) 50GB of disc space for the dataset
-- FFmpeg, which can be downloaded [here.](https://ffmpeg.org/download.html) 
+- FFmpeg, which can be downloaded [here.](https://ffmpeg.org/download.html). You will also need to download the `libx264-dev` library from [here.](https://packages.debian.org/sid/libx264-dev)  
 - git lfs installed, instruction on how to install git lfs [can be found here.](https://docs.github.com/en/repositories/working-with-files/managing-large-files/installing-git-large-file-storage)  
+- jupyter, can be install from [here.](https://jupyter.org/) 
 
 ## Installation
 
