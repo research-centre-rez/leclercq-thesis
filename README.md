@@ -67,7 +67,7 @@ git lfs pull
 ```
 
 > [!WARNING]
-> The whole dataset spans around 50GB of disk space. You can download a single video from the repository's page [here.](https://huggingface.co/datasets/research-centre-rez/concrete-samples/blob/main/3A.MP4). If you choose to do so, you will need to update the video path in `src/demo.ipynb` accordingly.
+> The whole dataset spans around 50GB of disk space. You can download a single video from the repository's page [here.](https://huggingface.co/datasets/research-centre-rez/concrete-samples/blob/main/3A.MP4) If you choose to do so, you will need to update the video path in `src/demo.ipynb` accordingly.
 
 ## Output
 
