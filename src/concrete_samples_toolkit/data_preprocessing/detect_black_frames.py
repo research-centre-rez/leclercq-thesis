@@ -66,6 +66,7 @@ def detect_black_frames(vid_path:str, threshold=5):
     black_frame_indices = []
     frame_count         = int(cap.get((cv.CAP_PROP_FRAME_COUNT)))
 
+    means = []
     with tqdm(range(frame_count), leave=False) as progress:
         for i in progress:
             ret, frame = cap.read()
@@ -73,7 +74,8 @@ def detect_black_frames(vid_path:str, threshold=5):
             if not ret:
                 break
 
-            mean = grid_sample_mean(frame,3000)
+            mean = grid_sample_mean(frame,300)
+            means.append(mean)
             #mean = monte_carlo_mean(frame, 100)
             progress.set_postfix(mean=mean)
 
