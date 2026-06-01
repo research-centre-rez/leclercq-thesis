@@ -95,7 +95,7 @@ class VideoProcessor:
 
         assert (
             len(analysis["angles"]) == total_frame_count
-        ), "Length of angles is not the same as video length"
+        ), f"Length of angles {len(analysis['angles'])} is not the same as video length {total_frame_count}"
 
         path, _ = os.path.split(save_as)
         os.makedirs(path, exist_ok=True)
