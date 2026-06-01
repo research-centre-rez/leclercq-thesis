@@ -45,6 +45,10 @@ def split_video(video_path:str, frame_idx:list[int], output_dir:str, fps:float) 
 
     video_index = 0 #index of video part
     for i in range(0, len(frame_idx), 2):
+        if i + 1 >= len(frame_idx):
+            logger.warning('Odd number of frame indices provided, skipping last index')
+            break
+
         logger.info('indices of frames: %s', (frame_idx[i], frame_idx[i+1]))
 
         start, end = frame_idx[i], frame_idx[i+1]
