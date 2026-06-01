@@ -89,9 +89,9 @@ class VideoProcessor:
         angle = np.float64(0.0)
 
         src_capture = prep_cap(source_path, self.start_at_frame)
-        total_frame_count = np.min(int(
+        total_frame_count = np.min([int(
             src_capture.get(cv.CAP_PROP_FRAME_COUNT) - self.start_at_frame
-        ), len(analysis["angles"]))
+        ), len(analysis["angles"])])
 
         assert (
             len(analysis["angles"]) == total_frame_count
