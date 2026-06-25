@@ -86,7 +86,7 @@ class VideoRegistrator:
         """
         Write the registered block and the transformations to disc.
         """
-        if not os.path.exists(os.path.dirname(os.path.save_as)):
+        if not os.path.exists(os.path.dirname(save_as)):
             os.makedirs(os.path.dirname(save_as))
 
         np.save(save_as, reg_analysis["registered_block"])
