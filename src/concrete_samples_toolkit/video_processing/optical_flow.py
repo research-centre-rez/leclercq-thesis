@@ -224,6 +224,10 @@ def analyse_sparse_optical_flow(
                 prev_gray, gray, corners, None, **lk_params
             )
 
+            if error is None:
+                logger.error(f"Failed tracking, skipping rest of frames {int(cap.get(cv.CAP_PROP_FRAME_COUNT)) - i}/{int(cap.get(cv.CAP_PROP_FRAME_COUNT))}")
+                break
+
             mean_error = np.mean(error[status == 1])
             pbar.set_postfix(mean_error=f"{mean_error:.4f}")
 
