@@ -31,10 +31,11 @@ def parse_args():
     # Required arguments
     req.add_argument('-i', '--input', type=str, required=True, help='Path to the input video or to the directory that contains videos that you want to split. The program will run through all of the videos that it can find in the directory.')
     req.add_argument('-o', '--output', type=str,required=True, help='Where do you want the videos to be saved')
+    req.add_argument('-s', '--min_length_s', type=int, default=30, help='How many seconds is minimum for valid split (shorter parts will be discarded).')
 
     return argparser.parse_args()
 
-def _split_videos_in_directory(directory_path:str, output_dir:str) -> None:
+def _split_videos_in_directory(directory_path:str, output_dir:str, min_duration_s:float = 0) -> None:
     '''
     Processes all videos found in `directory_path` and saves them in `output_dir`.
     '''
@@ -48,7 +49,7 @@ def _split_videos_in_directory(directory_path:str, output_dir:str) -> None:
                 rel_out_dir = os.path.join(output_dir, rel_dir)
                 video_path = os.path.join(root, file)
 
-                _split_video(video_path, rel_out_dir)
+                _split_video(video_path, rel_out_dir, min_duration_s)
                 found_any = True
 
     # In case no videos were processed successfully
@@ -58,17 +59,17 @@ def _split_videos_in_directory(directory_path:str, output_dir:str) -> None:
         except OSError:
             pass  # Directory not empty or failed for some other reason
 
-def _split_video(vid_path:str, out_path:str) -> None:
+def _split_video(vid_path:str, out_path:str, min_duration_s:float = 0) -> None:
     os.makedirs(out_path, exist_ok=True)
     try:
         black_f_id, fps = detect_black_frames(vid_path)
-        stats           = split_video(vid_path, black_f_id, out_path, fps)
+        stats           = split_video(vid_path, black_f_id, out_path, fps, min_duration_s)
 
         logger.info('Succesfully split a video. With the following stats:')
         for key, value in stats.items():
             logger.info('%s has length %s seconds', key, value)
 
-    except:
+    except Exception as e:
         logger.error("Wasn't able to split video: %s. Removing directory %s", vid_path, out_path)
 
         # Directory is empty
@@ -86,11 +87,11 @@ def main():
 
     if os.path.isdir(args.input):
         logger.info('Processing all video in directory %s', args.input)
-        _split_videos_in_directory(directory_path=args.input, output_dir=args.output)
+        _split_videos_in_directory(directory_path=args.input, output_dir=args.output, min_duration_s=args.min_length_s)
 
     else:
         logger.info('Processing video %s', args.input)
-        _split_video(vid_path=args.input, out_path=args.output)
+        _split_video(vid_path=args.input, out_path=args.output, min_duration_s=args.min_length_s)
 
 
 if __name__ == "__main__":

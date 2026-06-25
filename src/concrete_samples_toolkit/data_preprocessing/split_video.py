@@ -18,7 +18,7 @@ def _get_ffmpeg_timestamp(seconds) -> str:
     return f'{hours:02}:{minutes:02}:{secs:05.3f}'
 
 
-def split_video(video_path:str, frame_idx:list[int], output_dir:str, fps:float) -> dict:
+def split_video(video_path:str, frame_idx:list[int], output_dir:str, fps:float, min_duration:float = 0) -> dict:
     """
     Given the path of a video, split it into separate videos such that each sub-video contains only one angle of lighting.
     ffmpeg is used in order to preserve the quality of the video(s).
@@ -57,6 +57,10 @@ def split_video(video_path:str, frame_idx:list[int], output_dir:str, fps:float) 
         start_t  = round((start / fps), 2)
         end_t    = round((end / fps), 2)
         duration = end_t - start_t
+
+        if duration < min_duration:
+            logger.warning('Skipping video part with duration less than 30 seconds')
+            continue
 
         # ffmpeg uses hms time format so we convert
         start_t = _get_ffmpeg_timestamp(start_t)
