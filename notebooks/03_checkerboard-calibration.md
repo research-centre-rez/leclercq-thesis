@@ -12,6 +12,8 @@ jupyter:
     name: python3
 ---
 
+## Calibration by checkerboard target
+
 ```python
 %load_ext autoreload
 %autoreload 2
@@ -30,6 +32,8 @@ import matplotlib.pyplot as plt
 import os
 import matplotlib.colors as cls
 ```
+
+parametrization for successful checkerboard detection
 
 ```python
 args = {
@@ -51,6 +55,10 @@ args = {
 ```
 
 ```python
+# NAS calibration videos
+input_video_6B2 = "/Volumes/FUEL_BETON_TEAM/CM1/test_šachovnice/upravená/GX012208.MP4"
+input_video_6C1 = "/Volumes/FUEL_BETON_TEAM/CM1/test_šachovnice/upravená/GX012209.MP4"
+# Local copies of calibration video
 input_video_6B2 = "/Users/gimli/cvr/data/beton/CM1-sample/upravená/GX012208.MP4"
 input_video_6C1 = "/Users/gimli/cvr/data/beton/CM1-sample/upravená/GX012209.MP4"
 ```
@@ -128,6 +136,8 @@ data6B2 = detect_checkerboard_corners(input_video_6B2, args)
 data6C1 = detect_checkerboard_corners(input_video_6C1, args)
 ```
 
+## Random visualization of detected corners
+
 ```python
 plt.figure(figsize=(15, 5))
 plt.imshow(data6C1[150][0], cmap="gray")
@@ -135,6 +145,12 @@ plt.scatter(data6C1[150][1][:, 0] + tblr[2],
             data6C1[150][1][:, 1] + tblr[0], c="r", s=30, marker="+")
 plt.show()
 ```
+
+# Detection of the best calibration parameters
+
+Here we use GA programming for effective search in hundreds of frames.
+
+Each frame has the same spherical distortion and camera matrix but different perspective transformation (surface of the sample is not parallel to camera sensor). So we have to estimate perspective for each frame compensate it and then estimate spherical distortion best for all frames.
 
 ```python
 def genetic_calibration_subset(
@@ -500,6 +516,10 @@ c6C1 = prepare_calibration(input_video_6C1, data6C1)
 c6B2 = prepare_calibration(input_video_6B2, data6B2)
 ```
 
+## Coparison of both calibration parameter sets (from each video)
+
+We compute pixel displacement for both parameter sets and compare the positions afterwards. Important is the distance beteween points after distortion correction. The distance should be close to zero for all points of a sample. We compare only points on sample because calibration checkerboard is not present elsewhere and this will be weakly conditioned.
+
 ```python
 def distortion_displacement_in_mask(
     mask: np.ndarray,
@@ -616,6 +636,8 @@ ddmC = distortion_displacement_in_mask(
 )
 ```
 
+Visualization of displacement maps for both calibration parameter sets (from each video) and their difference.
+
 ```python
 plt.imshow(ddmC["displacement_map"] - ddmB["displacement_map"], cmap="viridis")
 plt.show()
@@ -651,10 +673,6 @@ img = np.copy(data6B2[300][0]).astype(float)
 img[tblr[0]:-tblr[1],tblr[2]:-tblr[3]] = img[tblr[0]:-tblr[1],tblr[2]:-tblr[3]] * (sample_mask + 1)
 plt.imshow(img, cmap="gray")
 plt.show()
-```
-
-```python
-sample_mask.shape
 ```
 
 ```python
