@@ -642,7 +642,7 @@ plt.show()
 ```
 
 ```python
-np.rad2deg(np.arctan(0.01))
+np.nanmax(ddmB["displacement_map"]), np.nanmax(ddmC["displacement_map"])
 ```
 
 ```python
@@ -655,6 +655,30 @@ plt.show()
 
 ```python
 sample_mask.shape
+```
+
+```python
+c6B2["transformation"]["dist"]
+```
+
+```python
+c6C1["transformation"]["dist"]
+```
+
+```python
+c6C1["transformation"]
+```
+
+```python
+c6B2["transformation"]["K"]
+```
+
+```python
+data6B2[150][1]
+```
+
+```python
+data6B2[150][2]
 ```
 
 ```python

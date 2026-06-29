@@ -29,7 +29,7 @@ Every first is front light, every second is side light - we have to split them
 
 ```python
 full_paths = []
-for root, dirs, files in os.walk("/Volumes/FUEL_BETON_TEAM/CM1/scan/after_expo/Sada_3(C)"):
+for root, dirs, files in os.walk("/Volumes/FUEL_BETON_TEAM/CM1/scan"):
     for file in files:
         if file.endswith("MP4"):
             full_paths.append(os.path.join(root, file))
@@ -67,7 +67,7 @@ raw_measurements = {}
 ```
 
 ```python
-for root, dirs, files in os.walk("/Users/gimli/cvr/data/beton/CM1-cracks/2026_06_27-115750"):
+for root, dirs, files in os.walk("/Users/gimli/cvr/data/beton/CM1-cracks/2026_06_28-204117"):
     for file in files:
         if file.endswith("samples.csv") and "6B2_rear" not in root and "6C1_front" not in root:
             key = "_".join(file.split("_")[0:2])
@@ -94,7 +94,15 @@ data = pd.concat([raw_measurements[key] for key in raw_measurements])
 ```
 
 ```python
-data[data["light_direction"] == "side_light"]
+data
+```
+
+```python
+ref_data = data[data["light_direction"] == "side_light"]
+```
+
+```python
+ref_data
 ```
 
 ```python
@@ -249,7 +257,11 @@ def select_knn_k(
 ```
 
 ```python
-select_knn_k(data, data.columns[6], data.columns[1])["k"].to_numpy()[0]
+ref_data
+```
+
+```python
+select_knn_k(ref_data, data.columns[6], data.columns[1])["k"].to_numpy()[0]
 ```
 
 ```python
@@ -302,13 +314,13 @@ plt.show()
 
 ```python
 test=[]
-test.append(pd.read_csv("/Users/gimli/cvr/data/beton/CM1-cracks/2026_06_27-121406/6B2_rear/6B2_rear_samples.csv"))
+test.append(pd.read_csv("/Users/gimli/cvr/data/beton/CM1-cracks/overeni/2026_06_27-121406/6B2_rear/6B2_rear_samples.csv"))
 test[0].drop(index=test[0].index[0], axis=0, inplace=True)
-test.append(pd.read_csv("/Users/gimli/cvr/data/beton/CM1-cracks/2026_06_27-121406/6C1_front/6C1_front_samples.csv"))
+test.append(pd.read_csv("/Users/gimli/cvr/data/beton/CM1-cracks/overeni/2026_06_27-121406/6C1_front/6C1_front_samples.csv"))
 ```
 
 ```python
-test[1]
+#pd.concat(test).to_excel("/Volumes/FUEL_BETON_TEAM/CM1/overeni/report.xlsx")
 ```
 
 ```python
@@ -347,8 +359,8 @@ for value_col in data.columns[1:-2]:
         interval = measurement_interval(t[value_col].mean(), group_stats, k["k"].to_numpy()[0])
         for ev, v in enumerate(t[value_col].to_numpy()):
             matches[value_col].append(bool(v < interval[0] or v > interval[1]))
-            if bool(v < interval[0] or v > interval[1]):
-                print(f"({en}/{ev}){value_col}: {v} -> ({interval[0]}-{interval[1]})")
+            #if bool(v < interval[0] or v > interval[1]):
+            print(f"({en}/{ev}){value_col}: {v} -> ({interval[0]:.2f}-{interval[1]:.2f})")
 
 ```
 
