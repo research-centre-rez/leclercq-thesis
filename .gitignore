@@ -1,5 +1,6 @@
 thesis_tex/aux/
 *.pdf
+*.ipynb
 .idea
 __pycache__
 venv
