@@ -14,6 +14,11 @@ jupyter:
 
 ## Calibration by checkerboard target
 
+__Summary__:
+- Detection of checkerboard corners (adaptation of parameters from checkerboard_corners package) => TODO: create package checkerboard_corners
+- Estimation of calibration parameters
+- Comparison of two independent calibrations
+
 ```python
 %load_ext autoreload
 %autoreload 2

@@ -14,7 +14,7 @@ jupyter:
 
 # Crack feature variability
 
-**Purpose of this notebook:** Testing of a new technology.
+**Purpose of this notebook:** Testing of "verified technology".
 
 **Background:** Tested technology is able to measure crack-features on a concrete sample. Samples are scanned by GoPro kamera in 4K resolution. Video frames are registered into a matrix where pixels belonging to the same physical surface point are in the same row of registered matrix. Matrix is then reduced into image suitable for cracks and bubbles segmentation. On a segmentation mask these features are described by - crackSkeletonSum, crackBoundaryLength, bubbleAreaSum, bubbleBoundary and bubbleCount.
 
